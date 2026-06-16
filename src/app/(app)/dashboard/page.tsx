@@ -3,7 +3,7 @@ import { PageTitle } from "@/components/ui/page-title";
 import { StatCard } from "@/components/ui/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { Lightbulb, Send, Calendar, MessageSquare, Plus, PenSquare, Image as ImageIcon, Edit2, Trash2, Check } from "lucide-react";
+import { Lightbulb, Send, Calendar, MessageSquare, Plus, PenSquare, Image as ImageIcon, Edit2, Trash2, Check, TrendingUp, Bot } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
