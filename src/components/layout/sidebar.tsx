@@ -47,13 +47,13 @@ const NavGroup = ({ items, title, pathname }: { items: typeof mainNavItems, titl
           key={item.href}
           href={item.href}
           className={cn(
-            "flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
+            "flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-all duration-200",
             isActive 
-              ? "bg-orange-50 text-orange-600" 
-              : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+              ? "bg-gradient-to-r from-orange-500/15 to-orange-500/5 text-orange-500 border border-orange-500/20" 
+              : "text-slate-400 hover:bg-slate-900/50 hover:text-slate-100 border border-transparent"
           )}
         >
-          <item.icon className={cn("h-4 w-4", isActive ? "text-orange-500" : "text-slate-400")} />
+          <item.icon className={cn("h-4 w-4", isActive ? "text-orange-500" : "text-slate-500 group-hover:text-slate-300")} />
           {item.title}
         </Link>
       );
@@ -71,13 +71,13 @@ export function Sidebar() {
   };
 
   return (
-    <div className="flex h-screen w-64 flex-col border-r border-slate-200 bg-white">
+    <div className="flex h-screen w-64 flex-col border-r border-slate-800/60 bg-slate-950 shadow-xl z-20 relative">
       <div className="p-6">
-        <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-orange-500 to-coral-600 flex items-center justify-center">
+        <Link href="/dashboard" className="flex items-center gap-3 group">
+          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-orange-500 to-coral-600 flex items-center justify-center shadow-lg shadow-orange-500/20 transition-transform group-hover:scale-105">
             <span className="text-white font-bold text-xl leading-none">C</span>
           </div>
-          <span className="font-bold text-xl tracking-tight text-slate-900">Command</span>
+          <span className="font-bold text-xl tracking-tight text-white">Command</span>
         </Link>
       </div>
 
@@ -86,24 +86,24 @@ export function Sidebar() {
         <NavGroup items={analyticNavItems} title="Listen & Grow" pathname={pathname} />
       </div>
 
-      <div className="p-4 border-t border-slate-100">
+      <div className="p-4 border-t border-slate-800/60">
         <Link
           href="/settings"
           className={cn(
-            "flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors w-full",
+            "flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors w-full border border-transparent",
             pathname === "/settings" 
-              ? "bg-orange-50 text-orange-600" 
-              : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+              ? "bg-gradient-to-r from-orange-500/15 to-orange-500/5 text-orange-500 border-orange-500/20" 
+              : "text-slate-400 hover:bg-slate-900/50 hover:text-slate-100"
           )}
         >
-          <Settings className="h-4 w-4 text-slate-400" />
+          <Settings className="h-4 w-4 text-slate-500" />
           Settings
         </Link>
         <button
           onClick={handleSignOut}
-          className="flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors w-full text-slate-600 hover:bg-red-50 hover:text-red-600 mt-1"
+          className="flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors w-full text-slate-400 hover:bg-red-500/10 hover:text-red-400 mt-1 border border-transparent hover:border-red-500/20"
         >
-          <LogOut className="h-4 w-4 text-slate-400" />
+          <LogOut className="h-4 w-4 text-slate-500" />
           Log out
         </button>
       </div>
