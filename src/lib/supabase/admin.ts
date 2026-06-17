@@ -3,7 +3,7 @@ import {
   createClient as createSupabaseClient,
   type SupabaseClient,
 } from "@supabase/supabase-js";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { isSupabaseConfigured, SUPABASE_URL } from "@/lib/supabase/config";
 
 /**
  * Service-role Supabase client — server-only, bypasses RLS.
@@ -23,7 +23,7 @@ export function isAdminConfigured(): boolean {
 export function createAdminClient(): SupabaseClient | null {
   if (!isAdminConfigured()) return null;
   return createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     {
       auth: { persistSession: false, autoRefreshToken: false },

@@ -20,14 +20,17 @@ npm install
 cp .env.example .env.local   # fill in Supabase values (see below)
 npm run dev                  # http://localhost:3000
 ```
-With **no** real Supabase values the app runs in **demo/preview mode**: auth is
-not enforced and every page renders the built-in demo data. Add real values to
-switch on auth + live data.
+The app is **live-by-default** — the public Supabase URL + anon key for the
+`social` project are baked into `src/lib/supabase/config.ts`, so it connects to
+the live database out of the box (auth enforced, real data). To run it as a
+**demo** (no auth, built-in sample data) — e.g. for a preview or fork — set
+`NEXT_PUBLIC_DEMO_MODE=true`, or override `NEXT_PUBLIC_SUPABASE_URL` /
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` to point at a different project.
 
 ## Supabase setup (project: `social`)
-1. **Env** — from *Settings → API*, set in `.env.local`:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+1. **Env (optional)** — the `social` URL + anon key are baked in as defaults, so
+   no env is needed to connect. Override `NEXT_PUBLIC_SUPABASE_URL` /
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY` only to target a different project.
 2. **Database schema** — run [`supabase/schema.sql`](./supabase/schema.sql) once.
    Either paste it into the **SQL editor** and run, or with the CLI:
    ```bash
@@ -46,8 +49,9 @@ switch on auth + live data.
    `workspace_members` row, and a `settings` row.
 
 ## How it works
-- **Config guard** (`src/lib/supabase/config.ts`) — `isSupabaseConfigured()`
-  decides demo vs live mode.
+- **Config guard** (`src/lib/supabase/config.ts`) — exports the baked
+  `SUPABASE_URL`/`SUPABASE_ANON_KEY` (env-overridable) plus `isSupabaseConfigured()`,
+  which is live-by-default; `NEXT_PUBLIC_DEMO_MODE=true` forces demo mode.
 - **Auth + route protection** — `src/proxy.ts` (Next 16 proxy/middleware) +
   `src/lib/supabase/middleware.ts` refresh the session and redirect
   unauthenticated users to `/login` (only when configured).
@@ -238,9 +242,13 @@ npm run lint    # eslint
 ```
 
 ## Deployment
-Deploy on Vercel. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-(and `NEXT_PUBLIC_APP_URL`) as project env vars. Without them the deployment runs
-in demo mode.
+Deploy on Vercel. The app connects to the live `social` Supabase **by default**
+(public URL + anon key are baked in) — no Supabase env vars are needed to leave
+demo mode. For full functionality set the **server-only** secrets:
+`SUPABASE_SERVICE_ROLE_KEY` (cron/maintenance runners + Stripe webhook), the AI
+keys, `CRON_SECRET`, `TOKEN_ENCRYPTION_KEY`, Stripe + per-platform OAuth creds,
+and `NEXT_PUBLIC_APP_URL`. To force a demo deployment, set
+`NEXT_PUBLIC_DEMO_MODE=true`.
 
 ## Status
 The MVP is feature-complete: OAuth + encrypted tokens, the publishing runner with
