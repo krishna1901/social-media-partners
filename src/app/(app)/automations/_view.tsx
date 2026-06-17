@@ -29,7 +29,11 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { automationLogs } from "@/lib/demo-data";
-import { toggleAutomationActive, toggleAutomationApproval } from "@/app/actions/automations";
+import {
+  toggleAutomationActive,
+  toggleAutomationApproval,
+  runAutomationsAction,
+} from "@/app/actions/automations";
 import type { listAutomations } from "@/lib/db/automations";
 
 type AutomationsViewProps = { automations: Awaited<ReturnType<typeof listAutomations>> };
@@ -137,6 +141,28 @@ export function AutomationsView({ automations }: AutomationsViewProps) {
   const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
+  // Manual "Run now" of the automation engine.
+  const [runPending, startRunTransition] = useTransition();
+  const [runNote, setRunNote] = useState<string | null>(null);
+
+  const handleRunNow = () => {
+    setError(null);
+    setRunNote(null);
+    startRunTransition(async () => {
+      const res = await runAutomationsAction();
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setRunNote(
+        res.matched > 0
+          ? `Processed ${res.matched} item${res.matched === 1 ? "" : "s"} — ${res.autoHandled} auto-handled, ${res.drafted} awaiting approval.`
+          : res.message ?? "No new inbox items matched your active automations."
+      );
+      router.refresh();
+    });
+  };
+
   // Local toggle state per automation so the switches feel live.
   const [toggles, setToggles] = useState(() =>
     Object.fromEntries(
@@ -203,11 +229,23 @@ export function AutomationsView({ automations }: AutomationsViewProps) {
         description="Approval-based DM and comment automations — no spam, always in your control."
         icon={<Zap className="h-5 w-5" />}
         actions={
-          <Button className="bg-gradient-to-r from-brand-500 to-coral-500 text-white shadow-sm shadow-brand-500/20 hover:opacity-95">
-            <Plus className="h-4 w-4" /> Create automation
-          </Button>
+          <>
+            <Button variant="outline" onClick={handleRunNow} disabled={runPending}>
+              <Play className={`h-4 w-4${runPending ? " animate-pulse" : ""}`} />
+              {runPending ? "Running…" : "Run now"}
+            </Button>
+            <Button className="bg-gradient-to-r from-brand-500 to-coral-500 text-white shadow-sm shadow-brand-500/20 hover:opacity-95">
+              <Plus className="h-4 w-4" /> Create automation
+            </Button>
+          </>
         }
       />
+
+      {runNote && (
+        <div className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-700">
+          {runNote}
+        </div>
+      )}
 
       {/* Safety banner */}
       <div className="flex items-start gap-4 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-brand-50/40 p-5 shadow-soft">

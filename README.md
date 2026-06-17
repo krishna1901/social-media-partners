@@ -194,6 +194,28 @@ still builds and previews without secrets.
   `4242 4242 4242 4242`. Configure the Dashboard webhook to the deployed URL for
   production.
 
+## Intelligence & full publishing (Phase 6)
+- **Competitor content-gap AI** — `/competitors` → "Analyze with AI" runs the
+  `gap-analysis` tool (`src/lib/ai/prompts.ts`) over your tracked competitors and
+  their best posts, returning structured gaps; "Create from gap" saves one to the
+  Ideas backlog. Quota-enforced + logged to `ai_generations`; demo-safe.
+- **Automation engine** — `src/lib/automations/runner.ts` evaluates a workspace's
+  active automations against new `comments_inbox` items, drafts replies, and
+  either auto-handles them or leaves a draft for approval (honoring
+  `requires_approval`); tracks `runs` / `last_run_at`. Run it via the
+  `/api/cron/inbox` endpoint (sync → automate, folded together for the Hobby
+  2-cron limit) or the **Run now** button on `/automations`.
+- **Real YouTube / TikTok / X publishing** — replaces the simulated stubs:
+  - **X** (`src/lib/integrations/x.ts`): real text post via `POST /2/tweets`.
+  - **TikTok** (`tiktok.ts`): Content Posting API `PULL_FROM_URL` — needs a linked
+    video asset.
+  - **YouTube** (`youtube.ts`): Data API v3 resumable upload — needs a linked
+    video asset.
+  - Short-lived X/Google tokens are auto-refreshed (`src/lib/publishing/refresh.ts`).
+    Live posting still requires each platform's approval (X paid API tier, TikTok
+    content-posting audit, YouTube upload scope) and the per-platform OAuth creds
+    in env; until connected, the runner keeps simulating (`PUBLISH_SIMULATE`).
+
 ## Scripts
 ```bash
 npm run dev     # dev server
@@ -206,12 +228,13 @@ Deploy on Vercel. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY
 (and `NEXT_PUBLIC_APP_URL`) as project env vars. Without them the deployment runs
 in demo mode.
 
-## Phase 3 — TODO (intentionally not in this PR)
-- Real OAuth connect flows + encrypted token storage (`connected_accounts`,
-  `social_tokens`, `platform_permissions`).
-- Real publishing per platform (`src/lib/publishing/platforms/*` — currently
-  placeholders; the runner + simulation already exist) — Phase 3C (LinkedIn),
-  3D (Meta), 3G (YouTube/TikTok/X).
-- Analytics sync + comment/DM sync into `analytics_snapshots` / `comments_inbox`.
-- Finish wiring the remaining list pages from demo fallback to live reads
-  (the data layer + actions are ready; dashboard counts are already live).
+## Status
+The MVP is feature-complete: OAuth + encrypted tokens, the publishing runner with
+real publishers for every platform (LinkedIn, Meta, X, TikTok, YouTube), analytics
++ inbox sync, the automation engine, AI Content Studio + competitor gap analysis,
+and Stripe billing. Everything degrades to a safe demo mode with no secrets.
+
+Going fully live is a configuration step — set the runtime secrets and per-platform
+OAuth/API credentials in the deployment (see `.env.example`), and complete each
+platform's app review where required (X paid API tier, TikTok content-posting
+audit, Meta/LinkedIn app approval).

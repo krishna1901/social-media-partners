@@ -9,7 +9,8 @@
 /** Supported AI providers (dependency-free REST calls under the hood). */
 export type AIProvider = "openai" | "anthropic";
 
-/** The 10 Content Studio tools (ids mirror `studioTools` in demo-data). */
+/** The 10 Content Studio tools (ids mirror `studioTools` in demo-data), plus
+ * the competitor "content gap" analysis (Phase 6). */
 export type AIToolId =
   | "hook"
   | "caption"
@@ -20,7 +21,8 @@ export type AIToolId =
   | "linkedin"
   | "instagram"
   | "repurpose"
-  | "brief";
+  | "brief"
+  | "gap-analysis";
 
 /** Run status persisted on every generation. */
 export type AIGenerationStatus = "success" | "demo" | "failed";
@@ -53,4 +55,16 @@ export interface AIGenerateResult {
   model: string | null;
   status: AIGenerationStatus;
   error?: string;
+}
+
+/**
+ * A single competitor content-gap suggestion (Phase 6). Parsed from the
+ * `gap-analysis` tool output; `tone` drives the InsightCard styling.
+ */
+export interface ContentGap {
+  id: string;
+  title: string;
+  body: string;
+  impact: string;
+  tone: "brand" | "warning" | "success";
 }

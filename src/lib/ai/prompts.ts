@@ -180,6 +180,24 @@ const TOOL_SPECS: Record<AIToolId, ToolSpec> = {
         "Success metric: Saves per impression > 2%.",
     ],
   },
+  "gap-analysis": {
+    label: "Content Gap Analyzer",
+    system:
+      "You are SocialFlow AI, a competitive content strategist. You compare a creator against tracked " +
+      "competitors and surface specific, actionable content gaps — formats, angles or cadences the rivals " +
+      "win with that the creator should try. Be concrete and reference the competitor or metric.",
+    instruction:
+      "From the competitor brief below, identify 3-5 content gaps the creator should act on. " +
+      "Return a numbered list. Each item MUST be a single line in EXACTLY this format:\n" +
+      "Title :: one concrete sentence of rationale that references a competitor or metric :: Impact: High|Medium|Quick win\n" +
+      "No preamble, no closing remarks, no extra lines.",
+    multi: true,
+    demo: [
+      "You're missing short documentaries :: Founder Diaries pulls 6.7% engagement on short-doc storytelling — a format you haven't published. One 3–5 min mini-doc per month could close the gap. :: Impact: High",
+      "Add a weekly hot-take thread :: AI Daily posts 21x/week leaning on opinionated threads while you publish zero — a recurring Monday hot-take tests a proven, low-effort format. :: Impact: Quick win",
+      "Try save-bait framework carousels :: Growth Lab's 'B2B content matrix' carousel earns 5.2% by packaging a framework as save-bait — mirror the angle with your own repeatable system. :: Impact: Medium",
+    ],
+  },
 };
 
 /** Public label lookup for a tool (used by history previews). */

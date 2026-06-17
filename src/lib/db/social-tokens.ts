@@ -156,6 +156,41 @@ export async function getDecryptedToken(
   }
 }
 
+/**
+ * Update just the stored token for a connected platform (e.g. after an OAuth
+ * refresh). Encrypts the new secrets in place; no-op when not connected or
+ * encryption isn't configured.
+ */
+export async function updateConnectionTokens(
+  client: SupabaseClient,
+  workspaceId: string,
+  platform: string,
+  t: { accessToken: string; refreshToken?: string | null; expiresAt?: string | null }
+): Promise<void> {
+  if (!isEncryptionConfigured()) return;
+
+  const { data: account } = await client
+    .from("connected_accounts")
+    .select("id")
+    .eq("workspace_id", workspaceId)
+    .eq("platform", platform)
+    .maybeSingle();
+  if (!account?.id) return;
+
+  const patch: Record<string, unknown> = {
+    access_token: encryptSecret(t.accessToken),
+    updated_at: new Date().toISOString(),
+  };
+  if (t.refreshToken) patch.refresh_token = encryptSecret(t.refreshToken);
+  if (t.expiresAt !== undefined) patch.expires_at = t.expiresAt;
+
+  await client
+    .from("social_tokens")
+    .update(patch)
+    .eq("workspace_id", workspaceId)
+    .eq("connected_account_id", account.id);
+}
+
 /** Remove a platform connection (account + token) from a workspace. */
 export async function removeConnection(
   client: SupabaseClient,

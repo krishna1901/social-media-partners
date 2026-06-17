@@ -6,9 +6,10 @@ import { createHash } from "crypto";
  *
  * A small registry + helpers that drive the generic `/api/oauth/[provider]/*`
  * routes. These connect accounts and store encrypted tokens using the same
- * pattern as LinkedIn/Meta. Real *publishing* for these platforms requires
- * additional platform approval (TikTok content-posting audit, X paid API tier,
- * YouTube resumable upload) and stays a simulated no-op in the runner for now.
+ * pattern as LinkedIn/Meta. Real *publishing* is implemented as of Phase 6
+ * (`src/lib/integrations/{x,tiktok,youtube}.ts`), but live posting still requires
+ * each platform's approval (TikTok content-posting audit, X paid API tier,
+ * YouTube upload scope); until connected, the runner simulates.
  *
  * LinkedIn and Meta keep their dedicated routes (static segments take
  * precedence over `[provider]`), so this registry only covers the new three.
@@ -165,6 +166,44 @@ export async function exchangeCode(
   const res = await fetch(p.tokenUrl, { method: "POST", headers, body });
   if (!res.ok) {
     throw new Error(`${p.label} token exchange failed (${res.status}): ${await res.text()}`);
+  }
+  const data = (await res.json()) as {
+    access_token: string;
+    refresh_token?: string;
+    expires_in?: number;
+  };
+  return {
+    accessToken: data.access_token,
+    refreshToken: data.refresh_token ?? null,
+    expiresIn: data.expires_in ?? 0,
+  };
+}
+
+/**
+ * Refresh an access token using a stored refresh token (Phase 6). Mirrors the
+ * per-provider auth quirks of `exchangeCode`. Used by the publishers for the
+ * short-lived X / Google access tokens.
+ */
+export async function refreshAccessToken(
+  id: ScaffoldId,
+  refreshToken: string
+): Promise<ScaffoldToken> {
+  const p = REGISTRY[id];
+  const body = new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken });
+
+  const headers: Record<string, string> = { "content-type": "application/x-www-form-urlencoded" };
+  if (p.tokenAuth === "basic") {
+    const creds = Buffer.from(`${clientId(p)}:${clientSecret(p)}`).toString("base64");
+    headers.authorization = `Basic ${creds}`;
+    body.set("client_id", clientId(p) as string);
+  } else {
+    body.set(p.clientIdParam, clientId(p) as string);
+    body.set("client_secret", clientSecret(p) as string);
+  }
+
+  const res = await fetch(p.tokenUrl, { method: "POST", headers, body });
+  if (!res.ok) {
+    throw new Error(`${p.label} token refresh failed (${res.status}): ${await res.text()}`);
   }
   const data = (await res.json()) as {
     access_token: string;

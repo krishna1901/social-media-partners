@@ -24,8 +24,13 @@ import { InsightCard } from "@/components/ui/insight-card";
 import { SelectField } from "@/components/ui/select-field";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
-import { createCompetitor } from "@/app/actions/competitors";
+import {
+  createCompetitor,
+  analyzeContentGapsAction,
+  createIdeaFromGapAction,
+} from "@/app/actions/competitors";
 import type { listCompetitors, listCompetitorPosts } from "@/lib/db/competitors";
+import type { ContentGap } from "@/lib/ai/types";
 
 type CompetitorsViewProps = {
   competitors: Awaited<ReturnType<typeof listCompetitors>>;
@@ -46,14 +51,8 @@ const platformLabels: Record<string, string> = {
   youtube: "YouTube",
 };
 
-// AI-detected content-gap suggestions (placeholder — defined inline).
-const contentGaps: {
-  id: string;
-  title: string;
-  body: string;
-  tone: "brand" | "warning" | "success";
-  impact: string;
-}[] = [
+// Seed gaps shown until a fresh AI analysis is run (and the demo-mode view).
+const INITIAL_GAPS: ContentGap[] = [
   {
     id: "g1",
     title: "You're missing short documentaries",
@@ -84,6 +83,43 @@ export function CompetitorsView({ competitors, competitorPosts }: CompetitorsVie
   const [platform, setPlatform] = useState("all");
   const [addError, setAddError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  // AI content-gap analysis.
+  const [gaps, setGaps] = useState<ContentGap[]>(INITIAL_GAPS);
+  const [gapPending, startGapTransition] = useTransition();
+  const [gapError, setGapError] = useState<string | null>(null);
+  const [gapNote, setGapNote] = useState<string | null>(null);
+
+  const handleAnalyzeGaps = () => {
+    setGapError(null);
+    setGapNote(null);
+    startGapTransition(async () => {
+      const res = await analyzeContentGapsAction();
+      if (!res.ok) {
+        setGapError(res.error);
+        return;
+      }
+      setGaps(res.gaps);
+      setGapNote(
+        res.demo
+          ? "Sample analysis — add an AI key for live, workspace-specific gaps."
+          : "Refreshed with AI analysis of your tracked competitors."
+      );
+    });
+  };
+
+  const handleCreateFromGap = (gap: ContentGap) => {
+    setGapError(null);
+    setGapNote(null);
+    startGapTransition(async () => {
+      const res = await createIdeaFromGapAction({ title: gap.title, body: gap.body });
+      if (!res.ok) {
+        setGapError(res.error);
+        return;
+      }
+      setGapNote(`Saved “${gap.title}” to Ideas.`);
+    });
+  };
 
   const avgPostsPerWeek = competitors.length
     ? Math.round(
@@ -157,7 +193,7 @@ export function CompetitorsView({ competitors, competitorPosts }: CompetitorsVie
         actions={
           <>
             <span className="hidden items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700 sm:inline-flex">
-              <Sparkles className="h-3.5 w-3.5" /> 5 gaps found
+              <Sparkles className="h-3.5 w-3.5" /> {gaps.length} gaps found
             </span>
             <Button
               onClick={handleAddCompetitor}
@@ -205,10 +241,9 @@ export function CompetitorsView({ competitors, competitorPosts }: CompetitorsVie
         />
         <StatCard
           label="Content gaps found"
-          value={5}
-          delta="+3"
+          value={gaps.length}
           positive
-          hint="AI-detected this week"
+          hint="AI-detected from rivals"
           icon={statAccents.gaps.icon}
           accent={statAccents.gaps.accent}
         />
@@ -336,20 +371,36 @@ export function CompetitorsView({ competitors, competitorPosts }: CompetitorsVie
         </div>
       </section>
 
-      {/* Content gap suggestions — AI placeholder */}
+      {/* Content gap suggestions — AI-generated */}
       <section className="space-y-4">
         <SectionHeader
           title="Content gap suggestions"
           description="Formats & angles your rivals win on that you haven't tried"
           icon={<Sparkles className="h-4 w-4 text-brand-500" />}
           action={
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-2.5 py-1 text-[11px] font-semibold text-brand-700">
-              <Sparkles className="h-3 w-3" /> AI suggestions
-            </span>
+            <Button
+              size="sm"
+              onClick={handleAnalyzeGaps}
+              disabled={gapPending}
+              className="bg-gradient-to-r from-brand-500 to-coral-500 text-white shadow-sm shadow-brand-500/20 hover:opacity-95"
+            >
+              <Sparkles className={`h-3.5 w-3.5${gapPending ? " animate-pulse" : ""}`} />
+              {gapPending ? "Analyzing…" : "Analyze with AI"}
+            </Button>
           }
         />
+
+        {(gapError || gapNote) && (
+          <p
+            className={`text-xs font-medium ${gapError ? "text-red-600" : "text-muted-foreground"}`}
+            role={gapError ? "alert" : undefined}
+          >
+            {gapError ?? gapNote}
+          </p>
+        )}
+
         <div className="grid items-stretch gap-4 lg:grid-cols-3">
-          {contentGaps.map((g) => (
+          {gaps.map((g) => (
             <InsightCard
               key={g.id}
               title={g.title}
@@ -359,7 +410,12 @@ export function CompetitorsView({ competitors, competitorPosts }: CompetitorsVie
               icon={<Sparkles className="h-4 w-4" />}
               className="h-full"
               action={
-                <Button variant="outline" size="sm">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleCreateFromGap(g)}
+                  disabled={gapPending}
+                >
                   Create from gap
                 </Button>
               }

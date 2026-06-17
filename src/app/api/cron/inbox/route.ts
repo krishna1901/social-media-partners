@@ -1,11 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { syncAllWorkspacesInbox } from "@/lib/inbox/sync";
+import { runAllWorkspacesAutomations } from "@/lib/automations/runner";
 
 /**
- * Inbox/comment sync endpoint (Phase 3F). Triggered by an external scheduler (or
- * folded into another job) — NOT registered in vercel.json to stay within the
- * Hobby 2-cron limit. Gated by `CRON_SECRET`; safe demo no-op without a service
- * role.
+ * Inbox/comment sync + automation engine endpoint (Phase 3F / Phase 6).
+ * Triggered by an external scheduler — NOT registered in vercel.json to stay
+ * within the Hobby 2-cron limit. First syncs new comments, then runs each
+ * workspace's active automations against them. Gated by `CRON_SECRET`; safe demo
+ * no-op without a service role.
  */
 export const dynamic = "force-dynamic";
 
@@ -23,8 +25,10 @@ async function handle(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
   try {
-    const summary = await syncAllWorkspacesInbox();
-    return NextResponse.json(summary);
+    // Sync first so automations can act on freshly-pulled comments.
+    const sync = await syncAllWorkspacesInbox();
+    const automations = await runAllWorkspacesAutomations();
+    return NextResponse.json({ ok: sync.ok && automations.ok, sync, automations });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Sync failed.";
     return NextResponse.json({ ok: false, error: message }, { status: 500 });

@@ -9,6 +9,7 @@ import {
   deleteAutomation as dbDeleteAutomation,
   type CreateAutomationInput,
 } from "@/lib/db/automations";
+import { runCurrentWorkspaceAutomations } from "@/lib/automations/runner";
 
 type ActionResult<T = Record<string, never>> =
   | ({ ok: true } & T)
@@ -83,6 +84,31 @@ export async function deleteAutomation(
     const deletedId = await dbDeleteAutomation(id);
     revalidateAutomations();
     return { ok: true, id: deletedId };
+  } catch (err) {
+    return { ok: false, error: errorMessage(err) };
+  }
+}
+
+/**
+ * Run the active automations for the current workspace against new inbox items
+ * now (the same engine the inbox cron runs). Demo-safe.
+ */
+export async function runAutomationsAction(): Promise<
+  | { ok: true; matched: number; drafted: number; autoHandled: number; automations: number; message?: string }
+  | { ok: false; error: string }
+> {
+  try {
+    const s = await runCurrentWorkspaceAutomations();
+    revalidatePath("/automations");
+    revalidatePath("/inbox");
+    return {
+      ok: true,
+      matched: s.matched,
+      drafted: s.drafted,
+      autoHandled: s.autoHandled,
+      automations: s.automations,
+      message: s.message,
+    };
   } catch (err) {
     return { ok: false, error: errorMessage(err) };
   }
