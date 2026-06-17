@@ -79,7 +79,7 @@ export async function listPosts(): Promise<MappedPost[]> {
     .neq("status", "archived")
     .order("created_at", { ascending: false });
 
-  if (error || !data || data.length === 0) return demoPosts;
+  if (error || !data) return [];
   return (data as PostRowWithChannels[]).map(toMappedPost);
 }
 

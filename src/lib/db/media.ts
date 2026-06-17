@@ -99,7 +99,7 @@ export async function listMedia(): Promise<MappedMedia[]> {
     .eq("archived", false)
     .order("created_at", { ascending: false });
 
-  if (error || !data || data.length === 0) return demoMediaAssets;
+  if (error || !data) return [];
   return (data as MediaRowWithPost[]).map(toMappedMedia);
 }
 

@@ -48,7 +48,7 @@ export async function listCalendarEvents(): Promise<MappedCalendarEvent[]> {
     .lt("scheduled_at", monthEnd.toISOString())
     .order("scheduled_at", { ascending: true });
 
-  if (error || !data || data.length === 0) return demoCalendarEvents;
+  if (error || !data) return [];
 
   return (data as PostRowWithChannels[]).map((row) => {
     const when = new Date(row.scheduled_at as string);

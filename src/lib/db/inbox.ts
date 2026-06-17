@@ -62,7 +62,7 @@ export async function listInbox(): Promise<MappedInboxThread[]> {
     .eq("workspace_id", ctx.workspaceId)
     .order("received_at", { ascending: false });
 
-  if (error || !data || data.length === 0) return demoInbox;
+  if (error || !data) return [];
   return (data as InboxRow[]).map(mapInbox);
 }
 

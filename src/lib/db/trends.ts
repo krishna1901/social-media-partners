@@ -33,7 +33,7 @@ export async function listTrends(): Promise<MappedTrend[]> {
     .neq("status", "archived")
     .order("relevance", { ascending: false });
 
-  if (error || !data || data.length === 0) return demoTrends;
+  if (error || !data) return [];
   return (data as TrendRow[]).map(mapTrend);
 }
 

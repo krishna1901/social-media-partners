@@ -82,7 +82,7 @@ export async function listCompetitors(): Promise<MappedCompetitor[]> {
     .eq("archived", false)
     .order("created_at", { ascending: true });
 
-  if (error || !data || data.length === 0) return demoCompetitors;
+  if (error || !data) return [];
   return (data as CompetitorRow[]).map(mapCompetitor);
 }
 
@@ -97,7 +97,7 @@ export async function listCompetitorPosts(): Promise<MappedCompetitorPost[]> {
     .eq("workspace_id", ctx.workspaceId)
     .order("created_at", { ascending: false });
 
-  if (error || !data || data.length === 0) return demoCompetitorPosts;
+  if (error || !data) return [];
 
   return (
     data as (CompetitorPostRow & { competitors: { name: string } | null })[]

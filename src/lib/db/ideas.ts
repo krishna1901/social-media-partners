@@ -51,7 +51,7 @@ export async function listIdeas(): Promise<MappedIdea[]> {
     .neq("status", "archived")
     .order("created_at", { ascending: false });
 
-  if (error || !data || data.length === 0) return demoIdeas;
+  if (error || !data) return [];
   return (data as ContentIdeaRow[]).map(toMappedIdea);
 }
 

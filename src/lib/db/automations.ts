@@ -49,7 +49,7 @@ export async function listAutomations(): Promise<MappedAutomation[]> {
     .eq("workspace_id", ctx.workspaceId)
     .order("created_at", { ascending: true });
 
-  if (error || !data || data.length === 0) return demoAutomations;
+  if (error || !data) return [];
   return (data as AutomationRow[]).map(mapAutomation);
 }
 
