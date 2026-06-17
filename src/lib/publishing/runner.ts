@@ -160,7 +160,7 @@ async function processJob(
 
   let result;
   try {
-    result = await publishToPlatform(job.platform as Platform, job, formatted);
+    result = await publishToPlatform(job.platform as Platform, job, formatted, { client });
   } catch (err) {
     result = {
       ok: false,
