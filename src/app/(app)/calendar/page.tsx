@@ -201,7 +201,9 @@ function MonthView({
 }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-      <div className="grid grid-cols-7 border-b border-border bg-muted/30">
+      <div className="overflow-x-auto scrollbar-thin">
+        <div className="min-w-[760px]">
+          <div className="grid grid-cols-7 border-b border-border bg-muted/30">
         {WEEKDAYS.map((d) => (
           <div key={d} className="px-3 py-2 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             {d}
@@ -260,6 +262,8 @@ function MonthView({
             </div>
           );
         })}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -270,7 +274,9 @@ function MonthView({
 function WeekView({ onSelect }: { onSelect: (e: CalendarEvent) => void }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-      <div className="grid grid-cols-[56px_repeat(7,minmax(0,1fr))] border-b border-border bg-muted/30">
+      <div className="overflow-x-auto scrollbar-thin">
+        <div className="min-w-[760px]">
+          <div className="grid grid-cols-[56px_repeat(7,minmax(0,1fr))] border-b border-border bg-muted/30">
         <div className="px-2 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Time</div>
         {WEEK_DAYS.map((day, i) => {
           const isToday = day === TODAY;
@@ -321,6 +327,8 @@ function WeekView({ onSelect }: { onSelect: (e: CalendarEvent) => void }) {
             })}
           </div>
         ))}
+      </div>
+        </div>
       </div>
     </div>
   );

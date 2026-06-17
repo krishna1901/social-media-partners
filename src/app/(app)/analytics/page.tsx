@@ -151,6 +151,8 @@ export default function AnalyticsPage() {
           subtitle="Reach, engagement & audience by channel"
           bodyClassName="p-0"
         >
+          <div className="overflow-x-auto scrollbar-thin">
+          <div className="min-w-[480px]">
           <div className="grid grid-cols-[1.4fr_1fr_1.4fr_1fr] gap-3 border-b border-border px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             <span>Platform</span>
             <span className="text-right">Reach</span>
@@ -179,6 +181,8 @@ export default function AnalyticsPage() {
               </li>
             ))}
           </ul>
+          </div>
+          </div>
         </ChartCard>
 
         <ChartCard

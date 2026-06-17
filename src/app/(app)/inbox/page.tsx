@@ -79,7 +79,7 @@ export default function InboxPage() {
 
       <div className="grid gap-4 lg:grid-cols-12">
         {/* LEFT: thread list */}
-        <section className="flex h-[calc(100vh-13rem)] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm lg:col-span-5 xl:col-span-4">
+        <section className="flex h-auto flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm lg:col-span-5 xl:col-span-4 lg:h-[calc(100vh-13rem)]">
           <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
             <h2 className="text-sm font-semibold text-foreground">
               Conversations
@@ -117,7 +117,7 @@ export default function InboxPage() {
         </section>
 
         {/* RIGHT: detail */}
-        <section className="flex h-[calc(100vh-13rem)] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm lg:col-span-7 xl:col-span-8">
+        <section className="flex h-auto flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm lg:col-span-7 xl:col-span-8 lg:h-[calc(100vh-13rem)]">
           {!selected ? (
             <div className="flex flex-1 items-center justify-center p-6">
               <EmptyState
