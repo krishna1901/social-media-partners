@@ -261,7 +261,8 @@ export async function getPostCounts(): Promise<PostCounts> {
   ]);
 
   if (total === null || drafts === null || scheduled === null || posted === null) {
-    return demoCounts;
+    // Live but a count query errored — report zeros, never demo numbers.
+    return { total: total ?? 0, drafts: drafts ?? 0, scheduled: scheduled ?? 0, posted: posted ?? 0 };
   }
   return { total, drafts, scheduled, posted };
 }

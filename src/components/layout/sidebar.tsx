@@ -5,13 +5,35 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronsUpDown, Check, Sparkles, LogOut, Settings as SettingsIcon, User } from "lucide-react";
 import { navGroups } from "@/lib/nav";
-import { workspaces, currentUser } from "@/lib/demo-data";
+import { workspaces as demoWorkspaces, currentUser } from "@/lib/demo-data";
 import { Avatar } from "@/components/ui/avatar";
+import { signOutAction } from "@/app/actions/auth";
 import { cn } from "@/lib/utils";
+import type { SessionView } from "@/lib/db/session";
 
-function WorkspaceSwitcher() {
+/** Two-letter initials from a display name. */
+function initialsFrom(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function WorkspaceSwitcher({ session }: { session: SessionView }) {
   const [open, setOpen] = useState(false);
-  const active = workspaces.find((w) => w.active) ?? workspaces[0];
+
+  const live = session.live && Boolean(session.workspaceName);
+  const active = live
+    ? {
+        id: "active",
+        name: session.workspaceName as string,
+        plan: session.plan ?? "starter",
+        initials: initialsFrom(session.workspaceName as string),
+        color: "from-brand-500 to-coral-500",
+        active: true,
+      }
+    : demoWorkspaces.find((w) => w.active) ?? demoWorkspaces[0];
+  const list = live ? [active] : demoWorkspaces;
 
   return (
     <div className="relative px-3">
@@ -23,7 +45,7 @@ function WorkspaceSwitcher() {
         <Avatar initials={active.initials} gradient={active.color} size="sm" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-white">{active.name}</p>
-          <p className="text-[11px] text-white/50">{active.plan} workspace</p>
+          <p className="text-[11px] capitalize text-white/50">{active.plan} workspace</p>
         </div>
         <ChevronsUpDown className="h-4 w-4 text-white/40" />
       </button>
@@ -32,7 +54,7 @@ function WorkspaceSwitcher() {
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
           <div className="absolute left-3 right-3 top-full z-20 mt-1 overflow-hidden rounded-xl border border-white/10 bg-sidebar-accent p-1 shadow-2xl">
-            {workspaces.map((w) => (
+            {list.map((w) => (
               <button
                 key={w.id}
                 onClick={() => setOpen(false)}
@@ -41,7 +63,7 @@ function WorkspaceSwitcher() {
                 <Avatar initials={w.initials} gradient={w.color} size="sm" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-white">{w.name}</p>
-                  <p className="text-[11px] text-white/50">{w.plan}</p>
+                  <p className="text-[11px] capitalize text-white/50">{w.plan}</p>
                 </div>
                 {w.active && <Check className="h-4 w-4 text-brand-400" />}
               </button>
@@ -58,8 +80,11 @@ function WorkspaceSwitcher() {
   );
 }
 
-function UserWidget() {
+function UserWidget({ session }: { session: SessionView }) {
   const [open, setOpen] = useState(false);
+  const name = session.live ? session.userName ?? "Your account" : currentUser.name;
+  const email = session.live ? session.userEmail ?? "" : currentUser.email;
+
   return (
     <div className="relative">
       <button
@@ -67,10 +92,10 @@ function UserWidget() {
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center gap-2.5 rounded-xl p-2 text-left transition-colors hover:bg-white/5"
       >
-        <Avatar initials={currentUser.initials} gradient="from-brand-500 to-coral-500" />
+        <Avatar initials={initialsFrom(name)} gradient="from-brand-500 to-coral-500" />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-white">{currentUser.name}</p>
-          <p className="truncate text-[11px] text-white/50">{currentUser.email}</p>
+          <p className="truncate text-sm font-semibold text-white">{name}</p>
+          <p className="truncate text-[11px] text-white/50">{email}</p>
         </div>
         <ChevronsUpDown className="h-4 w-4 text-white/40" />
       </button>
@@ -85,9 +110,11 @@ function UserWidget() {
             <Link href="/settings" onClick={() => setOpen(false)} className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-white/80 hover:bg-white/10">
               <SettingsIcon className="h-4 w-4" /> Settings
             </Link>
-            <button className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-red-300 hover:bg-white/10">
-              <LogOut className="h-4 w-4" /> Sign out
-            </button>
+            <form action={signOutAction}>
+              <button type="submit" className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-red-300 hover:bg-white/10">
+                <LogOut className="h-4 w-4" /> Sign out
+              </button>
+            </form>
           </div>
         </>
       )}
@@ -95,7 +122,15 @@ function UserWidget() {
   );
 }
 
-export function Sidebar({ className, onNavigate }: { className?: string; onNavigate?: () => void }) {
+export function Sidebar({
+  className,
+  onNavigate,
+  session,
+}: {
+  className?: string;
+  onNavigate?: () => void;
+  session: SessionView;
+}) {
   const pathname = usePathname();
 
   return (
@@ -115,7 +150,7 @@ export function Sidebar({ className, onNavigate }: { className?: string; onNavig
         </div>
       </div>
 
-      <WorkspaceSwitcher />
+      <WorkspaceSwitcher session={session} />
 
       {/* Navigation */}
       <nav className="mt-5 flex-1 space-y-6 overflow-y-auto scrollbar-hide px-3 pb-4">
@@ -158,15 +193,15 @@ export function Sidebar({ className, onNavigate }: { className?: string; onNavig
           <div className="absolute inset-x-0 top-0 h-px bg-white/30" />
           <p className="relative text-sm font-bold text-white">Upgrade to Agency</p>
           <p className="relative mt-0.5 text-[11px] leading-relaxed text-white/85">Unlimited workspaces, AI credits &amp; team seats.</p>
-          <button className="relative mt-3 w-full rounded-lg bg-white py-1.5 text-xs font-bold text-brand-700 shadow-sm transition-all hover:-translate-y-px hover:shadow-md">
+          <Link href="/billing" onClick={onNavigate} className="relative mt-3 block w-full rounded-lg bg-white py-1.5 text-center text-xs font-bold text-brand-700 shadow-sm transition-all hover:-translate-y-px hover:shadow-md">
             View plans
-          </button>
+          </Link>
         </div>
       </div>
 
       {/* User */}
       <div className="border-t border-white/10 p-3">
-        <UserWidget />
+        <UserWidget session={session} />
       </div>
     </aside>
   );

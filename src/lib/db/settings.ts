@@ -38,7 +38,9 @@ export async function getSettings(): Promise<MappedSettings> {
     .eq("workspace_id", ctx.workspaceId)
     .maybeSingle();
 
-  if (error || !data) return settingsDefaults;
+  // Live but the row is missing/errored — return neutral values, not the demo
+  // brand ("Rivera Studio"), so a real workspace never shows demo identity.
+  if (error || !data) return { ...settingsDefaults, brandName: "", tagline: "" };
   return mapSettings(data as SettingsRow);
 }
 
