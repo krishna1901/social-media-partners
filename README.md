@@ -109,6 +109,17 @@ switch on auth + live data.
 - **Publish** — once connected, the job runner posts real LinkedIn / Facebook /
   Instagram updates; not-yet-implemented platforms (YouTube/TikTok/X) simulate.
 
+## Analytics sync (Phase 3E)
+- **Engine** — `src/lib/analytics/sync.ts` pulls account-level metrics (Facebook
+  Page + Instagram Business followers) into `analytics_snapshots`. Uses stored
+  encrypted tokens; LinkedIn member analytics aren't publicly available so it's
+  Meta-only for now.
+- **Trigger** — `GET|POST /api/cron/analytics` (a second daily `vercel.json`
+  cron, `CRON_SECRET`-gated) for all workspaces, or the **"Sync now"** button on
+  the Analytics page for the active workspace.
+- **Surface** — when synced data exists, the Analytics page shows a live
+  per-platform follower strip; the showcase charts remain demo data.
+
 ## AI setup (Content Studio)
 The Content Studio works in two modes:
 - **Demo mode (default)** — with NO provider key set, generations return
