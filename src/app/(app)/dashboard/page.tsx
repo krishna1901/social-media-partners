@@ -35,6 +35,8 @@ import {
   activityFeed,
   smartRecommendations,
 } from "@/lib/demo-data";
+import { getPostCounts } from "@/lib/db/posts";
+import { listInbox } from "@/lib/db/inbox";
 
 const statMeta: Record<string, { icon: React.ReactNode; accent: string }> = {
   "total-posts": { icon: <PenSquare className="h-4 w-4" />, accent: "from-brand-500 to-coral-500" },
@@ -52,8 +54,17 @@ const recIcon: Record<string, React.ReactNode> = {
 };
 const recTone: Record<string, "brand" | "warning" | "success"> = { r1: "brand", r2: "warning", r3: "success" };
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
   const today = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+
+  // Real counts when Supabase is configured + authenticated; demo numbers otherwise.
+  const [counts, inboxItems] = await Promise.all([getPostCounts(), listInbox()]);
+  const statValues: Record<string, string | number> = {
+    "total-posts": counts.total.toLocaleString(),
+    drafts: counts.drafts.toLocaleString(),
+    scheduled: counts.scheduled.toLocaleString(),
+    inbox: inboxItems.length.toLocaleString(),
+  };
 
   return (
     <div className="space-y-6">
@@ -110,7 +121,7 @@ export default function DashboardPage() {
           <StatCard
             key={s.key}
             label={s.label}
-            value={s.value}
+            value={statValues[s.key] ?? s.value}
             delta={s.delta}
             positive={s.positive}
             hint={s.hint}
