@@ -120,6 +120,18 @@ switch on auth + live data.
 - **Surface** — when synced data exists, the Analytics page shows a live
   per-platform follower strip; the showcase charts remain demo data.
 
+## More platforms (Phase 3G — YouTube / TikTok / X)
+- **Scaffold** — `src/lib/integrations/scaffold.ts` + generic
+  `/api/oauth/[provider]/{start,callback}` routes connect YouTube (Google),
+  TikTok, and X (OAuth 2.0; X uses PKCE) and store encrypted tokens, reusing the
+  LinkedIn/Meta pattern. LinkedIn/Meta keep dedicated routes (static precedence).
+- **Config** — set the per-provider client id/secret (`GOOGLE_CLIENT_ID/SECRET`,
+  `TIKTOK_CLIENT_KEY/SECRET`, `X_CLIENT_ID/SECRET`) + `TOKEN_ENCRYPTION_KEY`.
+  Configured providers show a real Connect button on Integrations.
+- **Publishing** — real posting for these requires additional platform approval
+  (TikTok content-posting audit, X paid API tier, YouTube resumable upload), so
+  the runner still **simulates** them; the connection plumbing is ready.
+
 ## Inbox / comment sync (Phase 3F)
 - **Engine** — `src/lib/inbox/sync.ts` pulls recent comments from Facebook Page
   posts + Instagram media into `comments_inbox`, deduped by `external_id`

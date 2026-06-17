@@ -80,16 +80,24 @@ function isPlatform(id: string): id is Platform {
   return (PLATFORM_IDS as string[]).includes(id);
 }
 
+/** OAuth start path for a platform (LinkedIn + Meta have dedicated routes). */
+const OAUTH_HREF: Record<string, string> = {
+  linkedin: "/api/oauth/linkedin/start",
+  facebook: "/api/oauth/meta/start",
+  instagram: "/api/oauth/meta/start",
+  youtube: "/api/oauth/youtube/start",
+  tiktok: "/api/oauth/tiktok/start",
+  x: "/api/oauth/x/start",
+};
+
 /** OAuth start path + whether the provider is configured, for a platform. */
 function oauthStartFor(
   platform: string,
-  linkedinConfigured: boolean,
-  metaConfigured: boolean
+  configuredProviders: string[]
 ): { href: string; configured: boolean } | null {
-  if (platform === "linkedin") return { href: "/api/oauth/linkedin/start", configured: linkedinConfigured };
-  if (platform === "facebook" || platform === "instagram")
-    return { href: "/api/oauth/meta/start", configured: metaConfigured };
-  return null;
+  const href = OAUTH_HREF[platform];
+  if (!href) return null;
+  return { href, configured: configuredProviders.includes(platform) };
 }
 
 function IntegrationTile({ item }: { item: Integration }) {
@@ -110,19 +118,17 @@ function IntegrationTile({ item }: { item: Integration }) {
 function IntegrationCard({
   item,
   live,
-  linkedinConfigured,
-  metaConfigured,
+  configuredProviders,
   onDisconnect,
   disconnecting,
 }: {
   item: Integration;
   live: boolean;
-  linkedinConfigured: boolean;
-  metaConfigured: boolean;
+  configuredProviders: string[];
   onDisconnect: (platform: string) => void;
   disconnecting: boolean;
 }) {
-  const oauth = oauthStartFor(item.id, linkedinConfigured, metaConfigured);
+  const oauth = oauthStartFor(item.id, configuredProviders);
   // Connectable in demo (showcase) or when the provider's OAuth is configured.
   const connectable = !live || Boolean(oauth?.configured);
   const supportsDisconnect = live && Boolean(oauth);
@@ -206,13 +212,11 @@ function IntegrationCard({
 export function IntegrationsView({
   live,
   liveAccounts,
-  linkedinConfigured,
-  metaConfigured,
+  configuredProviders,
 }: {
   live: boolean;
   liveAccounts: MappedConnectedAccount[];
-  linkedinConfigured: boolean;
-  metaConfigured: boolean;
+  configuredProviders: string[];
 }) {
   const [status, setStatus] = useState<StatusFilter>("all");
   const [dismissed, setDismissed] = useState(false);
@@ -404,8 +408,7 @@ export function IntegrationsView({
                     key={item.id}
                     item={item}
                     live={live}
-                    linkedinConfigured={linkedinConfigured}
-                    metaConfigured={metaConfigured}
+                    configuredProviders={configuredProviders}
                     onDisconnect={handleDisconnect}
                     disconnecting={isDisconnecting}
                   />
