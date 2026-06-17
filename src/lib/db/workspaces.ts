@@ -48,9 +48,11 @@ export async function ensureUserBootstrapped(
     user.email?.split("@")[0] ??
     "My";
 
+  // New workspaces start on the free Starter plan; Pro/Agency require a real
+  // Stripe subscription (the webhook promotes the plan after checkout).
   const { data: ws, error: wsError } = await supabase
     .from("workspaces")
-    .insert({ name: `${baseName}'s Workspace`, owner_id: user.id, plan: "pro" })
+    .insert({ name: `${baseName}'s Workspace`, owner_id: user.id, plan: "starter" })
     .select("id")
     .single();
   if (wsError || !ws) return null;

@@ -28,6 +28,10 @@ export interface Workspace {
   slug: string | null;
   plan: "starter" | "pro" | "agency";
   owner_id: string;
+  /** Stripe billing (Phase 5) — null until the workspace subscribes. */
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  subscription_status: string | null;
   created_at: string;
   updated_at: string;
 }

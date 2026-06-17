@@ -95,6 +95,19 @@ comment on table public.workspaces is 'Tenant boundary; every record below is sc
 create index if not exists idx_workspaces_owner on public.workspaces (owner_id);
 create index if not exists idx_workspaces_created_at on public.workspaces (created_at);
 
+-- Phase 5: Stripe billing columns (additive; safe to re-run). subscription_status
+-- is free-text to tolerate the full Stripe status set (active, trialing,
+-- past_due, canceled, incomplete, unpaid, …) without future schema churn.
+alter table public.workspaces add column if not exists stripe_customer_id text;
+alter table public.workspaces add column if not exists stripe_subscription_id text;
+alter table public.workspaces add column if not exists subscription_status text;
+-- One workspace per Stripe customer (helps the webhook resolve customer→workspace).
+create unique index if not exists idx_workspaces_stripe_customer
+  on public.workspaces (stripe_customer_id)
+  where stripe_customer_id is not null;
+create index if not exists idx_workspaces_stripe_subscription
+  on public.workspaces (stripe_subscription_id);
+
 -- ============================================================================
 -- 3. workspace_members — membership + role join table.
 -- ============================================================================

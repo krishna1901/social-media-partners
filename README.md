@@ -159,10 +159,40 @@ The Content Studio works in two modes:
   AI generate action enforces the monthly generation quota and returns a clear
   upgrade message when exceeded.
 - **Billing page** — `/billing` shows the current plan, usage meters, and a plan
-  comparison. The upgrade CTA links to `NEXT_PUBLIC_UPGRADE_URL` (e.g. a Stripe
-  checkout) or a sales contact when unset. Real checkout is left as an
-  integration point.
+  comparison. The CTA drives **real Stripe Checkout / Billing Portal** (see below);
+  in demo mode the buttons are disabled.
 - **Resilience** — root `error.tsx` (recovery boundary) + branded `not-found.tsx`.
+
+## Stripe billing & checkout (Phase 5)
+Real subscriptions on top of the Phase 4 plan framework. **Demo-safe**: with no
+Stripe env the buttons disable and the webhook responds `200/skipped`, so the app
+still builds and previews without secrets.
+
+- **Flow** — hosted Stripe Checkout (subscription mode) + the Stripe Billing
+  Portal for upgrades/downgrades/cancellation. No `Stripe.js` / publishable key in
+  the browser — the server actions return a redirect URL.
+  - `src/lib/billing/stripe.ts` — client factory + `isStripeConfigured()` guard.
+  - `src/lib/billing/stripe-plans.ts` — authoritative PlanId ↔ Stripe Price map
+    (`planToPriceId` / `priceIdToPlan`); the checkout action only ever takes a
+    `PlanId`, never a client-supplied price.
+  - `src/app/actions/billing.ts` — `startCheckoutAction` + `openBillingPortalAction`.
+  - `src/app/(app)/billing/_plan-actions.tsx` — the per-plan CTA client island.
+- **Webhook** — `POST /api/stripe/webhook` verifies the signature against the raw
+  body and reconciles `workspaces.plan` (+ `stripe_customer_id`,
+  `stripe_subscription_id`, `subscription_status`) via the service-role client.
+  Handles `checkout.session.completed` and `customer.subscription.{created,updated,
+  deleted}`; deletion reverts to free **Starter**. Idempotent by design.
+- **Plan source of truth** — new workspaces start on **Starter**; the webhook
+  promotes the plan only after a confirmed subscription. Existing limit checks
+  (`usage.ts`, the AI quota) self-correct once the plan column changes.
+- **Env** — set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO`,
+  `STRIPE_PRICE_AGENCY` (recurring `price_…` IDs matching the $29 / $99 tiers in
+  `plans.ts`). `NEXT_PUBLIC_UPGRADE_URL` is now deprecated. Re-run
+  `supabase/schema.sql` to add the billing columns (additive + idempotent).
+- **Test mode** — `stripe listen --forward-to localhost:3000/api/stripe/webhook`,
+  copy the `whsec_…` into `STRIPE_WEBHOOK_SECRET`, then check out with test card
+  `4242 4242 4242 4242`. Configure the Dashboard webhook to the deployed URL for
+  production.
 
 ## Scripts
 ```bash

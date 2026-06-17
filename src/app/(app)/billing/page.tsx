@@ -1,15 +1,18 @@
 import { CreditCard, Check, Sparkles, Zap, Building2, type LucideIcon } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Progress } from "@/components/ui/progress";
-import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { getWorkspaceUsage } from "@/lib/billing/usage";
 import { PLAN_ORDER, PLANS, isUnlimited, type PlanId } from "@/lib/billing/plans";
+import { isStripeConfigured } from "@/lib/billing/stripe";
+import { getWorkspaceBilling } from "@/lib/db/billing";
+import { getDbContext, isLive } from "@/lib/db/context";
+import { PlanActions } from "./_plan-actions";
 
 /**
  * Billing (server) — current plan, live usage vs limits, and plan comparison.
- * The upgrade CTA links to `NEXT_PUBLIC_UPGRADE_URL` when set (real checkout is
- * out of scope); demo/preview shows representative usage.
+ * The CTA drives real Stripe Checkout / Billing Portal (see `_plan-actions`);
+ * demo/preview shows representative usage with the buttons disabled.
  */
 export const dynamic = "force-dynamic";
 
@@ -29,9 +32,23 @@ function limitLabel(limit: number): string {
   return isUnlimited(limit) ? "∞" : limit.toLocaleString();
 }
 
-export default async function BillingPage() {
+export default async function BillingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ checkout?: string }>;
+}) {
   const usage = await getWorkspaceUsage();
-  const upgradeUrl = process.env.NEXT_PUBLIC_UPGRADE_URL || "";
+  const { checkout } = await searchParams;
+
+  const stripeConfigured = isStripeConfigured();
+  let hasCustomer = false;
+  if (usage.live) {
+    const ctx = await getDbContext();
+    if (isLive(ctx)) {
+      const billing = await getWorkspaceBilling(ctx.supabase, ctx.workspaceId);
+      hasCustomer = Boolean(billing?.stripe_customer_id);
+    }
+  }
 
   const meters = [
     { label: "Connected accounts", metric: usage.connectedAccounts },
@@ -56,6 +73,17 @@ export default async function BillingPage() {
       {!usage.live && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           Demo mode — usage figures are illustrative. Sign in to see your workspace&apos;s real usage.
+        </div>
+      )}
+
+      {checkout === "success" && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          Subscription updated — your new plan is active. It may take a moment to reflect below.
+        </div>
+      )}
+      {checkout === "cancel" && (
+        <div className="rounded-xl border border-border bg-muted px-4 py-3 text-sm text-muted-foreground">
+          Checkout cancelled — no changes were made.
         </div>
       )}
 
@@ -116,25 +144,15 @@ export default async function BillingPage() {
               </ul>
 
               <div className="mt-5 pt-1">
-                {isCurrent ? (
-                  <Button variant="outline" className="w-full" disabled>
-                    Current plan
-                  </Button>
-                ) : upgradeUrl ? (
-                  <a
-                    href={upgradeUrl}
-                    className={cn(buttonVariants({ variant: plan.featured ? "gradient" : "outline" }), "w-full")}
-                  >
-                    Choose {plan.name}
-                  </a>
-                ) : (
-                  <a
-                    href="mailto:sales@socialflow.ai?subject=Upgrade%20to%20"
-                    className={cn(buttonVariants({ variant: plan.featured ? "gradient" : "outline" }), "w-full")}
-                  >
-                    Contact sales
-                  </a>
-                )}
+                <PlanActions
+                  planId={id}
+                  planName={plan.name}
+                  featured={plan.featured ?? false}
+                  isCurrent={isCurrent}
+                  live={usage.live}
+                  stripeConfigured={stripeConfigured}
+                  hasCustomer={hasCustomer}
+                />
               </div>
             </div>
           );
