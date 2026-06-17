@@ -9,6 +9,7 @@ import {
   Flame,
   Clock,
   ArrowUpRight,
+  Plug,
 } from "lucide-react";
 import { StatCard } from "@/components/ui/stat-card";
 import { ChartCard } from "@/components/ui/chart-card";
@@ -21,6 +22,7 @@ import { AreaChart } from "@/components/charts/area-chart";
 import { BarChart } from "@/components/charts/bar-chart";
 import { DonutChart } from "@/components/charts/donut-chart";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   currentUser,
   dashboardStats,
@@ -35,8 +37,10 @@ import {
   activityFeed,
   smartRecommendations,
 } from "@/lib/demo-data";
-import { getPostCounts } from "@/lib/db/posts";
+import { getPostCounts, type PostCounts } from "@/lib/db/posts";
 import { listInbox } from "@/lib/db/inbox";
+import { listRecentGenerations, type RecentGeneration } from "@/lib/db/ai-generations";
+import { getSessionView } from "@/lib/db/session";
 
 const statMeta: Record<string, { icon: React.ReactNode; accent: string }> = {
   "total-posts": { icon: <PenSquare className="h-4 w-4" />, accent: "from-brand-500 to-coral-500" },
@@ -56,14 +60,206 @@ const recTone: Record<string, "brand" | "warning" | "success"> = { r1: "brand", 
 
 export default async function DashboardPage() {
   const today = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
-
-  // Real counts when Supabase is configured + authenticated; demo numbers otherwise.
+  const session = await getSessionView();
   const [counts, inboxItems] = await Promise.all([getPostCounts(), listInbox()]);
+
+  // Demo/preview mode → the rich showcase. Live → the real (possibly empty) account.
+  if (!session.live) {
+    return <DemoDashboard today={today} counts={counts} inboxCount={inboxItems.length} />;
+  }
+
+  const generations = await listRecentGenerations();
+  const firstName = (session.userName ?? "there").split(" ")[0];
+  return (
+    <LiveDashboard
+      today={today}
+      firstName={firstName}
+      counts={counts}
+      inboxCount={inboxItems.length}
+      generations={generations}
+    />
+  );
+}
+
+/* ------------------------------- live account ------------------------------ */
+
+function LiveDashboard({
+  today,
+  firstName,
+  counts,
+  inboxCount,
+  generations,
+}: {
+  today: string;
+  firstName: string;
+  counts: PostCounts;
+  inboxCount: number;
+  generations: RecentGeneration[];
+}) {
+  const liveStats: { key: string; label: string; value: number | string; hint: string }[] = [
+    { key: "total-posts", label: "Total posts", value: counts.total, hint: "all content" },
+    { key: "drafts", label: "Drafts", value: counts.drafts, hint: "in progress" },
+    { key: "scheduled", label: "Scheduled", value: counts.scheduled, hint: "queued to publish" },
+    { key: "ai-generated", label: "AI generated", value: generations.length, hint: "recent" },
+    { key: "inbox", label: "Inbox", value: inboxCount, hint: "messages" },
+    { key: "engagement", label: "Engagement", value: "—", hint: "after publishing" },
+  ];
+
+  const steps = [
+    { title: "Create your first post", desc: "Compose & schedule across channels", href: "/posts/new", icon: PenSquare },
+    { title: "Connect a channel", desc: "Link LinkedIn, Instagram, X & more", href: "/integrations", icon: Plug },
+    { title: "Generate with AI", desc: "Draft captions, hooks & ideas", href: "/content-studio", icon: Sparkles },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Hero */}
+      <section className="relative overflow-hidden rounded-3xl bg-sidebar p-6 text-white sm:p-8">
+        <div className="absolute -right-10 -top-16 h-56 w-56 rounded-full bg-brand-500/40 blur-3xl" />
+        <div className="absolute -bottom-20 right-1/3 h-56 w-56 rounded-full bg-coral-500/20 blur-3xl" />
+        <div className="bg-grid absolute inset-0 opacity-40" />
+        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-sm font-medium text-white/50">{today}</p>
+            <h1 className="mt-1 text-3xl font-extrabold tracking-tight sm:text-4xl">
+              Welcome, {firstName} 👋
+            </h1>
+            <p className="mt-2 max-w-lg text-sm text-white/70">
+              You have <span className="font-semibold text-white">{counts.scheduled} scheduled</span>,{" "}
+              <span className="font-semibold text-white">{counts.drafts} drafts</span>, and{" "}
+              <span className="font-semibold text-white">{inboxCount} inbox messages</span>. Let&apos;s get your first post out.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-2.5">
+              <Link href="/posts/new">
+                <Button className="bg-white text-sidebar hover:bg-white/90">
+                  <PenSquare className="h-4 w-4" /> Create post
+                </Button>
+              </Link>
+              <Link href="/content-studio">
+                <Button variant="outline" className="border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white">
+                  <Sparkles className="h-4 w-4" /> Generate with AI
+                </Button>
+              </Link>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3 lg:gap-4">
+            {steps.map((s) => (
+              <Link
+                key={s.href}
+                href={s.href}
+                className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm transition-transform duration-300 hover:-translate-y-0.5"
+              >
+                <s.icon className="h-4 w-4 text-brand-300" />
+                <p className="mt-2 text-xs font-semibold leading-tight">{s.title}</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Stat cards (real) */}
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+        {liveStats.map((s) => (
+          <StatCard
+            key={s.key}
+            label={s.label}
+            value={typeof s.value === "number" ? s.value.toLocaleString() : s.value}
+            hint={s.hint}
+            icon={statMeta[s.key]?.icon}
+            accent={statMeta[s.key]?.accent}
+          />
+        ))}
+      </div>
+
+      {/* Get started + recent AI */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <ChartCard
+          title="Get started"
+          subtitle="A few steps to set up your workspace"
+          className="lg:col-span-2"
+          bodyClassName="p-0"
+        >
+          <ul className="divide-y divide-border">
+            {steps.map((s) => (
+              <li key={s.href}>
+                <Link href={s.href} className="flex items-center gap-3 px-5 py-4 transition-colors hover:bg-muted/40">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
+                    <s.icon className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground">{s.title}</p>
+                    <p className="text-[11px] text-muted-foreground">{s.desc}</p>
+                  </div>
+                  <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </ChartCard>
+
+        <ChartCard
+          title="Recent AI Generations"
+          action={<Link href="/content-studio" className="text-xs font-semibold text-brand-600 hover:underline">Studio</Link>}
+          bodyClassName={generations.length === 0 ? undefined : "p-0"}
+        >
+          {generations.length === 0 ? (
+            <EmptyState
+              icon={<Sparkles className="h-5 w-5" />}
+              title="No generations yet"
+              description="Use the Content Studio to draft your first post."
+            />
+          ) : (
+            <ul className="divide-y divide-border">
+              {generations.map((g) => (
+                <li key={g.id} className="flex items-start gap-3 px-5 py-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-600">
+                    <Sparkles className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-foreground">{g.toolName}</p>
+                    <p className="line-clamp-1 text-xs text-muted-foreground">{g.preview}</p>
+                    <p className="text-[11px] text-muted-foreground/70">{g.time}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </ChartCard>
+      </div>
+
+      {/* Quick actions + activity */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <ChartCard title="Quick Actions" subtitle="Jump into your workflow">
+          <QuickActions />
+        </ChartCard>
+        <ChartCard title="Activity" className="lg:col-span-2">
+          <EmptyState
+            icon={<Clock className="h-5 w-5" />}
+            title="No activity yet"
+            description="Publishing, comments and automation runs will show up here."
+          />
+        </ChartCard>
+      </div>
+    </div>
+  );
+}
+
+/* --------------------------------- demo ----------------------------------- */
+
+function DemoDashboard({
+  today,
+  counts,
+  inboxCount,
+}: {
+  today: string;
+  counts: PostCounts;
+  inboxCount: number;
+}) {
   const statValues: Record<string, string | number> = {
     "total-posts": counts.total.toLocaleString(),
     drafts: counts.drafts.toLocaleString(),
     scheduled: counts.scheduled.toLocaleString(),
-    inbox: inboxItems.length.toLocaleString(),
+    inbox: inboxCount.toLocaleString(),
   };
 
   return (

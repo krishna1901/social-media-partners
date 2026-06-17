@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { CommandBar } from "@/components/ui/command-bar";
 import { Button } from "@/components/ui/button";
-import { notifications } from "@/lib/demo-data";
+import { notifications as demoNotifications } from "@/lib/demo-data";
 import { cn } from "@/lib/utils";
 
 const createOptions = [
@@ -33,10 +33,12 @@ const notifKindColor: Record<string, string> = {
   ai: "bg-brand-100 text-brand-600",
 };
 
-export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
+export function Header({ onMenuClick, live }: { onMenuClick?: () => void; live?: boolean }) {
   const router = useRouter();
   const [createOpen, setCreateOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  // Live accounts have no notification feed yet → empty; demo shows the showcase.
+  const notifications = live ? [] : demoNotifications;
   const unread = notifications.filter((n) => n.unread).length;
 
   return (
@@ -119,21 +121,30 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
               <div className="absolute right-0 z-20 mt-2 w-80 overflow-hidden rounded-2xl border border-border bg-card shadow-elevated animate-in fade-in zoom-in-95 duration-150">
                 <div className="flex items-center justify-between border-b border-border px-4 py-3">
                   <p className="text-sm font-semibold text-foreground">Notifications</p>
-                  <button className="text-xs font-medium text-brand-600 hover:underline">Mark all read</button>
+                  {notifications.length > 0 && (
+                    <button className="text-xs font-medium text-brand-600 hover:underline">Mark all read</button>
+                  )}
                 </div>
                 <div className="max-h-80 overflow-y-auto scrollbar-thin">
-                  {notifications.map((n) => (
-                    <div key={n.id} className={cn("flex gap-3 px-4 py-3 transition-colors hover:bg-muted/50", n.unread && "bg-brand-50/30")}>
-                      <span className={cn("mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", notifKindColor[n.kind] ?? "bg-muted text-muted-foreground")}>
-                        {n.kind === "success" ? <Check className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-foreground">{n.title}</p>
-                        <p className="line-clamp-2 text-xs text-muted-foreground">{n.body}</p>
-                        <p className="mt-0.5 text-[11px] text-muted-foreground/70">{n.time}</p>
-                      </div>
+                  {notifications.length === 0 ? (
+                    <div className="px-4 py-10 text-center">
+                      <p className="text-sm font-medium text-foreground">You&apos;re all caught up</p>
+                      <p className="mt-1 text-xs text-muted-foreground">New activity will show up here.</p>
                     </div>
-                  ))}
+                  ) : (
+                    notifications.map((n) => (
+                      <div key={n.id} className={cn("flex gap-3 px-4 py-3 transition-colors hover:bg-muted/50", n.unread && "bg-brand-50/30")}>
+                        <span className={cn("mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", notifKindColor[n.kind] ?? "bg-muted text-muted-foreground")}>
+                          {n.kind === "success" ? <Check className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-foreground">{n.title}</p>
+                          <p className="line-clamp-2 text-xs text-muted-foreground">{n.body}</p>
+                          <p className="mt-0.5 text-[11px] text-muted-foreground/70">{n.time}</p>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
                 <Link href="/inbox" onClick={() => setNotifOpen(false)} className="block border-t border-border px-4 py-2.5 text-center text-xs font-semibold text-brand-600 hover:bg-muted/50">
                   Open inbox
