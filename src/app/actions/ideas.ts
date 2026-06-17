@@ -1,32 +1,89 @@
 "use server";
 
-// Mock database for ideas
-let ideasStore = [
-  { id: "1", title: "5 tips for productivity", content_type: "text", status: "new" },
-  { id: "2", title: "Why Next.js is great", content_type: "video", status: "in_progress" }
-];
+import { revalidatePath } from "next/cache";
+import {
+  createIdea as dbCreateIdea,
+  updateIdea as dbUpdateIdea,
+  archiveIdea as dbArchiveIdea,
+  deleteIdea as dbDeleteIdea,
+  convertIdeaToPost as dbConvertIdeaToPost,
+  type IdeaInput,
+} from "@/lib/db/ideas";
 
-export async function getIdeas() {
-  return ideasStore;
+type ActionResult<T = Record<string, never>> =
+  | ({ ok: true } & T)
+  | { ok: false; error: string };
+
+/** Extracts a user-safe message from an unknown thrown value (no stack traces). */
+function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === "string") return err;
+  return "Something went wrong.";
 }
 
-export async function createIdea(formData: FormData) {
-  const title = formData.get("title") as string;
-  const content_type = formData.get("content_type") as string;
-  
-  ideasStore.push({
-    id: Math.random().toString(36).substring(7),
-    title,
-    content_type,
-    status: "new"
-  });
+/** Revalidate routes whose data depends on ideas (and posts, on conversion). */
+function revalidateIdeas(): void {
+  revalidatePath("/ideas");
+  revalidatePath("/posts");
 }
 
-export async function deleteIdea(id: string) {
-  ideasStore = ideasStore.filter(i => i.id !== id);
+export async function createIdea(
+  input: IdeaInput
+): Promise<ActionResult<{ id: string }>> {
+  try {
+    const idea = await dbCreateIdea(input);
+    revalidateIdeas();
+    return { ok: true, id: idea.id };
+  } catch (err) {
+    return { ok: false, error: errorMessage(err) };
+  }
 }
 
-export async function updateIdeaStatus(id: string, status: string) {
-  const idea = ideasStore.find(i => i.id === id);
-  if (idea) idea.status = status;
+export async function updateIdea(
+  id: string,
+  input: IdeaInput
+): Promise<ActionResult<{ id: string }>> {
+  try {
+    const idea = await dbUpdateIdea(id, input);
+    revalidateIdeas();
+    return { ok: true, id: idea.id };
+  } catch (err) {
+    return { ok: false, error: errorMessage(err) };
+  }
+}
+
+export async function archiveIdea(
+  id: string
+): Promise<ActionResult<{ id: string }>> {
+  try {
+    const idea = await dbArchiveIdea(id);
+    revalidateIdeas();
+    return { ok: true, id: idea.id };
+  } catch (err) {
+    return { ok: false, error: errorMessage(err) };
+  }
+}
+
+export async function deleteIdea(
+  id: string
+): Promise<ActionResult<{ id: string }>> {
+  try {
+    const deletedId = await dbDeleteIdea(id);
+    revalidateIdeas();
+    return { ok: true, id: deletedId };
+  } catch (err) {
+    return { ok: false, error: errorMessage(err) };
+  }
+}
+
+export async function convertIdeaToPost(
+  ideaId: string
+): Promise<ActionResult<{ id: string }>> {
+  try {
+    const postId = await dbConvertIdeaToPost(ideaId);
+    revalidateIdeas();
+    return { ok: true, id: postId };
+  } catch (err) {
+    return { ok: false, error: errorMessage(err) };
+  }
 }

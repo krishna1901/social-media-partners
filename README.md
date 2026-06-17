@@ -1,36 +1,85 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SocialFlow AI — AI Content Command Center
 
-## Getting Started
+An AI-powered content intelligence, scheduling, analytics, inbox, competitor and
+automation platform for creators, marketers, agencies and small businesses.
 
-First, run the development server:
+- **Phase 1 / 1.5 / 1.6** — premium SaaS UI (design system, 14 pages, charts,
+  loading/empty states). _Merged._
+- **Phase 2** _(this branch)_ — the real Supabase backend foundation: auth,
+  workspace-aware schema + RLS, a typed data-access layer, CRUD server actions,
+  Storage media upload, and a scheduling/job foundation. Demo data is retained
+  as a fallback so the app still runs with no backend configured.
 
+## Stack
+Next.js 16 (App Router) · React 19 · TypeScript · Tailwind v4 · Supabase
+(Postgres + Auth + Storage).
+
+## Quick start
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env.local   # fill in Supabase values (see below)
+npm run dev                  # http://localhost:3000
+```
+With **no** real Supabase values the app runs in **demo/preview mode**: auth is
+not enforced and every page renders the built-in demo data. Add real values to
+switch on auth + live data.
+
+## Supabase setup (project: `social`)
+1. **Env** — from *Settings → API*, set in `.env.local`:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+2. **Database schema** — run [`supabase/schema.sql`](./supabase/schema.sql) once.
+   Either paste it into the **SQL editor** and run, or with the CLI:
+   ```bash
+   supabase link --project-ref ttffcglpaurhlcwfeqqz
+   psql "$SUPABASE_DB_URL" -f supabase/schema.sql
+   ```
+   It is idempotent (safe to re-run). It creates all 21 tables, indexes,
+   `updated_at` triggers, **RLS policies**, the storage buckets, and a trigger
+   that auto-creates a `profiles` row for each new auth user.
+   > This schema has already been applied to the live `social` project.
+3. **Storage buckets** — created by the schema: `media`, `thumbnails`,
+   `carousels`, `videos` (public read) and `zips` (authenticated read). No manual
+   step needed.
+4. **Auth** — email/password is used out of the box (`/signup`, `/login`). On
+   first login the app bootstraps a `profile`, a default `workspace`, an owner
+   `workspace_members` row, and a `settings` row.
+
+## How it works
+- **Config guard** (`src/lib/supabase/config.ts`) — `isSupabaseConfigured()`
+  decides demo vs live mode.
+- **Auth + route protection** — `src/proxy.ts` (Next 16 proxy/middleware) +
+  `src/lib/supabase/middleware.ts` refresh the session and redirect
+  unauthenticated users to `/login` (only when configured).
+- **Data access layer** (`src/lib/db/*`) — typed `list/get/create/update/archive`
+  functions, workspace-scoped, that return the same shapes the UI already uses
+  and **fall back to demo data** when not configured/authenticated.
+- **Server actions** (`src/app/actions/*`) — thin `"use server"` wrappers over
+  the data layer with `revalidatePath`.
+- **Storage** (`src/lib/storage.ts`) — validated uploads to the right bucket.
+- **Scheduler** (`src/lib/publishing/*`) — `scheduled_posts` → `publishing_jobs`
+  → `publishing_logs`, with per-platform **placeholder** formatters/publishers.
+  No real publishing happens yet.
+
+## Scripts
+```bash
+npm run dev     # dev server
+npm run build   # production build (also typechecks)
+npm run lint    # eslint
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Deployment
+Deploy on Vercel. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+(and `NEXT_PUBLIC_APP_URL`) as project env vars. Without them the deployment runs
+in demo mode.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Phase 3 — TODO (intentionally not in this PR)
+- Real OAuth connect flows + encrypted token storage (`connected_accounts`,
+  `social_tokens`, `platform_permissions`).
+- Real publishing per platform (`src/lib/publishing/platforms/*` — currently
+  placeholders) + a cron/queue **job runner** that drains `publishing_jobs`.
+- Real AI generation (OpenAI / Claude) behind `src/app/actions/generate.ts`,
+  persisting to `ai_generations`.
+- Analytics sync + comment/DM sync into `analytics_snapshots` / `comments_inbox`.
+- Finish wiring the remaining list pages from demo fallback to live reads
+  (the data layer + actions are ready; dashboard counts are already live).

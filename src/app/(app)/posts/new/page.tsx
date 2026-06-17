@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -39,6 +40,9 @@ import { PlatformBadge } from "@/components/ui/platform-badge";
 import { PlatformIcon } from "@/components/ui/platform-icon";
 import { platformMeta, type Platform } from "@/lib/demo-data";
 import { cn } from "@/lib/utils";
+import { createPost, setPostChannels, schedulePostAction } from "@/app/actions/posts";
+import type { ScheduleMode } from "@/lib/publishing/scheduler";
+import type { PostType } from "@/lib/db/types";
 
 const POST_TYPES = [
   { value: "carousel", label: "Carousel", icon: GalleryHorizontalEnd },
@@ -69,6 +73,10 @@ const MEDIA_THUMBS = [
 ];
 
 export default function NewPostPage() {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [saveError, setSaveError] = useState<string | null>(null);
+
   const [selectedChannels, setSelectedChannels] = useState<Set<Platform>>(
     new Set<Platform>(["instagram", "linkedin"])
   );
@@ -77,12 +85,77 @@ export default function NewPostPage() {
   const [scheduleMode, setScheduleMode] = useState("queue");
 
   const [title, setTitle] = useState("");
+  const [topic, setTopic] = useState("");
   const [universalCaption, setUniversalCaption] = useState(
     "We rebuilt our entire content system in a weekend — here's the exact playbook we used to ship 10x faster. 🚀"
   );
   const [igCaption, setIgCaption] = useState("");
   const [liCaption, setLiCaption] = useState("");
+  const [hashtags, setHashtags] = useState(
+    "#contentmarketing #creators #socialmedia #aitools"
+  );
+  const [cta, setCta] = useState("");
+  const [notes, setNotes] = useState("");
+  const [schedDate, setSchedDate] = useState("2026-06-18");
+  const [schedTime, setSchedTime] = useState("09:00");
   const [attachments, setAttachments] = useState(MEDIA_THUMBS);
+
+  // The composer's current fields, mapped to the data layer's PostInput shape.
+  const composerInput = () => ({
+    title,
+    topic: topic.trim() || null,
+    post_type: postType as PostType,
+    universal_caption: universalCaption.trim() || null,
+    instagram_caption: igCaption.trim() || null,
+    linkedin_caption: liCaption.trim() || null,
+    hashtags: hashtags.trim() || null,
+    cta: cta.trim() || null,
+    notes: notes.trim() || null,
+  });
+
+  // Persist the post + its selected channels; returns the new id, or null on error.
+  const persistPost = async (
+    status: "draft" | "scheduled"
+  ): Promise<string | null> => {
+    const created = await createPost({ ...composerInput(), status });
+    if (!created.ok) {
+      setSaveError(created.error);
+      return null;
+    }
+    const channels = await setPostChannels(created.id, Array.from(selectedChannels));
+    if (!channels.ok) {
+      setSaveError(channels.error);
+      return null;
+    }
+    return created.id;
+  };
+
+  const handleSaveDraft = () => {
+    setSaveError(null);
+    startTransition(async () => {
+      const id = await persistPost("draft");
+      if (id) router.push("/posts");
+    });
+  };
+
+  const handleSchedule = () => {
+    setSaveError(null);
+    startTransition(async () => {
+      const id = await persistPost("scheduled");
+      if (!id) return;
+      const mode: ScheduleMode = scheduleMode === "queue" ? "next_queue" : (scheduleMode as ScheduleMode);
+      const scheduledAt =
+        scheduleMode === "custom"
+          ? new Date(`${schedDate}T${schedTime}`).toISOString()
+          : null;
+      const scheduled = await schedulePostAction(id, mode, scheduledAt);
+      if (!scheduled.ok) {
+        setSaveError(scheduled.error);
+        return;
+      }
+      router.push("/posts");
+    });
+  };
 
   const toggleChannel = (p: Platform) => {
     setSelectedChannels((prev) => {
@@ -121,14 +194,26 @@ export default function NewPostPage() {
         icon={<PenSquare className="h-5 w-5" />}
         actions={
           <>
-            <Button variant="ghost">Save draft</Button>
+            <Button variant="ghost" onClick={handleSaveDraft} disabled={pending}>
+              Save draft
+            </Button>
             <Button variant="outline">Mark ready</Button>
-            <Button className="bg-gradient-to-r from-brand-500 to-coral-500 text-white shadow-sm shadow-brand-500/20 hover:opacity-90">
+            <Button
+              onClick={handleSchedule}
+              disabled={pending}
+              className="bg-gradient-to-r from-brand-500 to-coral-500 text-white shadow-sm shadow-brand-500/20 hover:opacity-90"
+            >
               <CalendarDays className="h-4 w-4" /> Schedule post
             </Button>
           </>
         }
       />
+
+      {saveError && (
+        <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
+          {saveError}
+        </p>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-12">
         {/* LEFT — editor */}
@@ -147,7 +232,12 @@ export default function NewPostPage() {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="post-topic">Topic</Label>
-                <Input id="post-topic" placeholder="e.g. AI workflows, content systems" />
+                <Input
+                  id="post-topic"
+                  placeholder="e.g. AI workflows, content systems"
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label>Post type</Label>
@@ -253,7 +343,8 @@ export default function NewPostPage() {
                 <Textarea
                   id="hashtags"
                   rows={2}
-                  defaultValue="#contentmarketing #creators #socialmedia #aitools"
+                  value={hashtags}
+                  onChange={(e) => setHashtags(e.target.value)}
                   placeholder="#contentmarketing #creators #aitools"
                 />
               </div>
@@ -261,7 +352,12 @@ export default function NewPostPage() {
                 <Label htmlFor="cta" className="gap-1.5">
                   <MousePointerClick className="h-3.5 w-3.5 text-muted-foreground" /> Call to action
                 </Label>
-                <Input id="cta" placeholder="Follow for more content systems →" />
+                <Input
+                  id="cta"
+                  placeholder="Follow for more content systems →"
+                  value={cta}
+                  onChange={(e) => setCta(e.target.value)}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="notes" className="gap-1.5">
@@ -270,6 +366,8 @@ export default function NewPostPage() {
                 <Textarea
                   id="notes"
                   rows={2}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
                   placeholder="Notes for your team — context, approvals, reminders…"
                 />
               </div>
@@ -407,11 +505,21 @@ export default function NewPostPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="sched-date">Date</Label>
-                    <Input id="sched-date" type="date" defaultValue="2026-06-18" />
+                    <Input
+                      id="sched-date"
+                      type="date"
+                      value={schedDate}
+                      onChange={(e) => setSchedDate(e.target.value)}
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="sched-time">Time</Label>
-                    <Input id="sched-time" type="time" defaultValue="09:00" />
+                    <Input
+                      id="sched-time"
+                      type="time"
+                      value={schedTime}
+                      onChange={(e) => setSchedTime(e.target.value)}
+                    />
                   </div>
                 </div>
               )}
