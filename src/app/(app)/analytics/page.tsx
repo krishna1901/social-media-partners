@@ -1,49 +1,318 @@
 "use client";
 
-import { PageTitle } from "@/components/ui/page-title";
+import { Download, CalendarCheck, Rocket, LayoutGrid } from "lucide-react";
 import { StatCard } from "@/components/ui/stat-card";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart2, Users, Eye, MousePointerClick } from "lucide-react";
+import { ChartCard } from "@/components/ui/chart-card";
+import { InsightCard } from "@/components/ui/insight-card";
+import { PageHeader } from "@/components/ui/page-header";
+import { Button } from "@/components/ui/button";
+import { SelectField } from "@/components/ui/select-field";
+import { Progress } from "@/components/ui/progress";
+import { PlatformBadge, PlatformChip } from "@/components/ui/platform-badge";
+import { AreaChart } from "@/components/charts/area-chart";
+import { BarChart } from "@/components/charts/bar-chart";
+import { DonutChart } from "@/components/charts/donut-chart";
+import {
+  analyticsMetrics,
+  analyticsReachSeries,
+  analyticsTopPosts,
+  platformComparison,
+  bestPostingTimes,
+  contentTypePerformance,
+  platformBreakdown,
+  engagementTrend,
+  formatNumber,
+} from "@/lib/demo-data";
+
+// Inline sparklines to enrich the headline metrics (local demo data).
+const metricSparks: Record<string, number[]> = {
+  reach: [62, 68, 64, 75, 81, 78, 92, 100],
+  impressions: [40, 44, 41, 52, 58, 61, 70, 76],
+  engagement: [12, 14, 13, 18, 22, 21, 26, 31],
+  saves: [4, 5, 5, 7, 9, 8, 11, 13],
+};
+
+// Heatmap hour columns (6 AM → 10 PM, every 2 hours).
+const HOURS = [6, 8, 10, 12, 14, 16, 18, 20, 22];
+
+function hourLabel(h: number) {
+  const period = h >= 12 ? "p" : "a";
+  const display = h % 12 === 0 ? 12 : h % 12;
+  return `${display}${period}`;
+}
+
+// Used to scale the heatmap tint intensity per day.
+const maxHoursPerDay = Math.max(...bestPostingTimes.map((d) => d.hours.length));
 
 export default function AnalyticsPage() {
   return (
     <div className="space-y-6">
-      <PageTitle title="Analytics" description="Track the performance of your content and audience growth." />
+      <PageHeader
+        eyebrow="Analytics"
+        title="Performance"
+        description="Track reach, engagement and growth across platforms."
+        actions={
+          <>
+            <SelectField
+              options={["Last 7 days", "Last 30 days", "Last 90 days", "This year"]}
+              defaultValue="Last 30 days"
+              className="w-40"
+            />
+            <SelectField
+              options={[
+                "All platforms",
+                { value: "instagram", label: "Instagram" },
+                { value: "linkedin", label: "LinkedIn" },
+                { value: "tiktok", label: "TikTok" },
+                { value: "youtube", label: "YouTube" },
+                { value: "x", label: "X" },
+              ]}
+              defaultValue="All platforms"
+              className="w-40"
+            />
+            <Button variant="ghost">
+              <Download className="h-4 w-4" /> Export
+            </Button>
+          </>
+        }
+      />
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard 
-          title="Total Views" 
-          value="1.2M" 
-          description="+12% from last month"
-          icon={<div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center"><Eye className="h-4 w-4 text-blue-600" /></div>}
-        />
-        <StatCard 
-          title="Engagement Rate" 
-          value="4.8%" 
-          description="+0.6% from last month"
-          icon={<div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center"><MousePointerClick className="h-4 w-4 text-emerald-600" /></div>}
-        />
-        <StatCard 
-          title="Followers Gained" 
-          value="+4,230" 
-          description="Consistent growth"
-          icon={<div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center"><Users className="h-4 w-4 text-purple-600" /></div>}
-        />
-        <StatCard 
-          title="Top Platform" 
-          value="LinkedIn" 
-          description="60% of total engagement"
-          icon={<div className="h-8 w-8 rounded-full bg-orange-100 flex items-center justify-center"><BarChart2 className="h-4 w-4 text-orange-600" /></div>}
-        />
+      {/* Headline metrics */}
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
+        {analyticsMetrics.map((m) => (
+          <StatCard
+            key={m.key}
+            label={m.label}
+            value={m.value}
+            delta={m.delta}
+            positive={m.positive}
+            spark={metricSparks[m.key]}
+          />
+        ))}
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card className="bg-white/80 backdrop-blur-sm border-slate-200/60 shadow-sm min-h-[300px] flex items-center justify-center text-slate-500">
-          Chart Placeholder (e.g. Recharts Line Chart)
-        </Card>
-        <Card className="bg-white/80 backdrop-blur-sm border-slate-200/60 shadow-sm min-h-[300px] flex items-center justify-center text-slate-500">
-          Chart Placeholder (e.g. Recharts Bar Chart)
-        </Card>
+      {/* Charts row 1: reach over time + platform mix */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <ChartCard
+          title="Reach over time"
+          subtitle="Weekly accounts reached across all platforms"
+          className="lg:col-span-2"
+          action={
+            <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
+              +58.9% vs prior period
+            </span>
+          }
+          footer={<span>412.8K total reach · peak of 124K in Wk 8</span>}
+        >
+          <AreaChart
+            data={analyticsReachSeries}
+            valueFormatter={formatNumber}
+            color="var(--chart-3)"
+            height={240}
+          />
+        </ChartCard>
+
+        <ChartCard title="Platform mix" subtitle="Share of total reach">
+          <DonutChart
+            data={platformBreakdown}
+            centerLabel="412.8K"
+            centerSublabel="Total reach"
+            size={150}
+          />
+        </ChartCard>
+      </div>
+
+      {/* Charts row 2: engagement trend + content type performance */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <ChartCard title="Engagement trend" subtitle="8-week engagement rate (%)">
+          <AreaChart
+            data={engagementTrend}
+            valueFormatter={(n) => `${n}%`}
+            color="var(--chart-1)"
+            height={220}
+          />
+        </ChartCard>
+
+        <ChartCard title="Content type performance" subtitle="Avg. engagement rate by format">
+          <BarChart
+            data={contentTypePerformance}
+            showValues
+            valueFormatter={(n) => `${n}%`}
+            height={220}
+            barClassName="from-violet-500 to-indigo-400 group-hover:from-violet-600 group-hover:to-indigo-500"
+          />
+        </ChartCard>
+      </div>
+
+      {/* Platform comparison + Top posts */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <ChartCard
+          title="Platform comparison"
+          subtitle="Reach, engagement & audience by channel"
+          bodyClassName="p-0"
+        >
+          <div className="grid grid-cols-[1.4fr_1fr_1.4fr_1fr] gap-3 border-b border-border px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <span>Platform</span>
+            <span className="text-right">Reach</span>
+            <span>Engagement</span>
+            <span className="text-right">Followers</span>
+          </div>
+          <ul className="divide-y divide-border">
+            {platformComparison.map((p) => (
+              <li
+                key={p.platform}
+                className="grid grid-cols-[1.4fr_1fr_1.4fr_1fr] items-center gap-3 px-5 py-3"
+              >
+                <PlatformBadge platform={p.platform} />
+                <span className="text-right text-sm font-semibold text-foreground">
+                  {formatNumber(p.reach)}
+                </span>
+                <div className="flex items-center gap-2">
+                  <Progress value={p.engagement * 10} className="h-1.5" />
+                  <span className="w-10 shrink-0 text-xs font-semibold text-foreground">
+                    {p.engagement}%
+                  </span>
+                </div>
+                <span className="text-right text-sm font-medium text-muted-foreground">
+                  {p.followers}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </ChartCard>
+
+        <ChartCard
+          title="Top posts"
+          subtitle="Highest-reaching content this period"
+          bodyClassName="p-0"
+        >
+          <ul className="divide-y divide-border">
+            {analyticsTopPosts.map((post, i) => (
+              <li key={post.id} className="flex items-center gap-3 px-5 py-3">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-bold text-muted-foreground">
+                  {i + 1}
+                </span>
+                <PlatformChip platform={post.platform} />
+                <p className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+                  {post.title}
+                </p>
+                <div className="hidden shrink-0 items-center gap-5 text-right sm:flex">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">{post.reach}</p>
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                      Reach
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-600">{post.engagement}</p>
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                      Eng.
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">{post.saves}</p>
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                      Saves
+                    </p>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </ChartCard>
+      </div>
+
+      {/* Best posting times heatmap */}
+      <ChartCard
+        title="Best posting times"
+        subtitle="When your audience is most active (local time)"
+        action={
+          <div className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground">
+            Low
+            <span className="flex items-center gap-1">
+              <span className="h-3 w-3 rounded bg-brand-100" />
+              <span className="h-3 w-3 rounded bg-brand-300" />
+              <span className="h-3 w-3 rounded bg-brand-500" />
+            </span>
+            High
+          </div>
+        }
+      >
+        <div className="overflow-x-auto">
+          <div className="min-w-[520px]">
+            {/* Hour labels */}
+            <div className="mb-1.5 grid grid-cols-[44px_repeat(9,1fr)] gap-1.5">
+              <span />
+              {HOURS.map((h) => (
+                <span
+                  key={h}
+                  className="text-center text-[10px] font-medium text-muted-foreground"
+                >
+                  {hourLabel(h)}
+                </span>
+              ))}
+            </div>
+            {/* Day rows */}
+            <div className="space-y-1.5">
+              {bestPostingTimes.map((row) => (
+                <div
+                  key={row.day}
+                  className="grid grid-cols-[44px_repeat(9,1fr)] items-center gap-1.5"
+                >
+                  <span className="text-xs font-semibold text-foreground">{row.day}</span>
+                  {HOURS.map((h) => {
+                    const active = row.hours.includes(h);
+                    // Vary opacity by how "peak" the day is overall.
+                    const intensity = row.hours.length / maxHoursPerDay;
+                    return (
+                      <div
+                        key={h}
+                        title={`${row.day} · ${hourLabel(h)} — ${active ? "active" : "quiet"}`}
+                        className={
+                          active
+                            ? "h-7 rounded-md bg-gradient-to-br from-brand-500 to-coral-500 ring-1 ring-brand-300/40"
+                            : "h-7 rounded-md bg-muted/60"
+                        }
+                        style={active ? { opacity: 0.55 + intensity * 0.45 } : undefined}
+                      />
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </ChartCard>
+
+      {/* Key insights */}
+      <div>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">Key insights</h2>
+          <span className="text-xs text-muted-foreground">Auto-generated from your data</span>
+        </div>
+        <div className="grid gap-3 md:grid-cols-3">
+          <InsightCard
+            tone="success"
+            icon={<CalendarCheck className="h-4 w-4" />}
+            title="Thursday is your best day"
+            body="Thursdays drive the most active windows (4 peak hours). Front-load your highest-priority posts here for maximum reach."
+            impact="Best day"
+          />
+          <InsightCard
+            tone="brand"
+            icon={<Rocket className="h-4 w-4" />}
+            title="Reach is accelerating"
+            body="Weekly reach climbed from 78K to 124K over 8 weeks — a 58.9% lift. Engagement rate is up to 6.8%, your highest yet."
+            impact="Fastest growing"
+          />
+          <InsightCard
+            tone="info"
+            icon={<LayoutGrid className="h-4 w-4" />}
+            title="Carousels outperform everything"
+            body="Carousels lead at 8.9% engagement — nearly 2x your image posts. Shift more of your mix toward swipeable formats."
+            impact="Top format"
+          />
+        </div>
       </div>
     </div>
   );

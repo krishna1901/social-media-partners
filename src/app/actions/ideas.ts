@@ -12,7 +12,6 @@ export async function getIdeas() {
 
 export async function createIdea(formData: FormData) {
   const title = formData.get("title") as string;
-  const topic = formData.get("topic") as string;
   const content_type = formData.get("content_type") as string;
   
   ideasStore.push({

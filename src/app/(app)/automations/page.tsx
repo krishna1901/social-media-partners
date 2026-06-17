@@ -1,48 +1,325 @@
 "use client";
 
-import { PageTitle } from "@/components/ui/page-title";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useState } from "react";
+import {
+  Plus,
+  Shield,
+  Zap,
+  Play,
+  Clock4,
+  Users,
+  MessageSquareReply,
+  MessageCircle,
+  UserPlus,
+  Magnet,
+  HelpCircle,
+  Gift,
+  ArrowRight,
+} from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
+import { SectionHeader } from "@/components/ui/section-header";
+import { StatCard } from "@/components/ui/stat-card";
+import { ChartCard } from "@/components/ui/chart-card";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { Bot, Plus, ArrowRight, Zap } from "lucide-react";
+import { DataTable, type Column } from "@/components/ui/data-table";
+import { automations, automationLogs } from "@/lib/demo-data";
+
+type AutomationType = "dm-keyword" | "comment-reply" | "lead-capture";
+
+const typeMeta: Record<
+  AutomationType,
+  { label: string; icon: React.ReactNode; chip: string }
+> = {
+  "dm-keyword": {
+    label: "DM keyword",
+    icon: <MessageCircle className="h-4 w-4" />,
+    chip: "bg-sky-50 text-sky-700",
+  },
+  "comment-reply": {
+    label: "Comment auto-reply",
+    icon: <MessageSquareReply className="h-4 w-4" />,
+    chip: "bg-violet-50 text-violet-700",
+  },
+  "lead-capture": {
+    label: "Lead capture",
+    icon: <Magnet className="h-4 w-4" />,
+    chip: "bg-emerald-50 text-emerald-700",
+  },
+};
+
+const typeAccent: Record<AutomationType, string> = {
+  "dm-keyword": "from-sky-500 to-blue-500",
+  "comment-reply": "from-violet-500 to-indigo-500",
+  "lead-capture": "from-emerald-500 to-teal-500",
+};
+
+// Enable-able templates (placeholder content — defined inline).
+const templates: {
+  id: string;
+  name: string;
+  desc: string;
+  icon: React.ReactNode;
+  accent: string;
+}[] = [
+  {
+    id: "tpl-lead",
+    name: "Lead magnet DM",
+    desc: "Auto-send a freebie when a follower comments your keyword.",
+    icon: <Magnet className="h-5 w-5" />,
+    accent: "from-brand-500 to-coral-500",
+  },
+  {
+    id: "tpl-welcome",
+    name: "Welcome reply",
+    desc: "Greet first-time commenters with a warm, on-brand thank-you.",
+    icon: <UserPlus className="h-5 w-5" />,
+    accent: "from-violet-500 to-indigo-500",
+  },
+  {
+    id: "tpl-faq",
+    name: "FAQ auto-responder",
+    desc: "Reply to common questions about pricing, hours & links.",
+    icon: <HelpCircle className="h-5 w-5" />,
+    accent: "from-sky-500 to-cyan-500",
+  },
+  {
+    id: "tpl-giveaway",
+    name: "Giveaway entry capture",
+    desc: "Log entrants who comment your giveaway keyword into a list.",
+    icon: <Gift className="h-5 w-5" />,
+    accent: "from-amber-400 to-orange-500",
+  },
+];
+
+type LogRow = (typeof automationLogs)[number];
+
+const logColumns: Column<LogRow>[] = [
+  {
+    key: "automation",
+    header: "Automation",
+    render: (row) => <span className="font-medium text-foreground">{row.automation}</span>,
+  },
+  {
+    key: "event",
+    header: "Event",
+    render: (row) => <span className="text-muted-foreground">{row.event}</span>,
+  },
+  {
+    key: "status",
+    header: "Status",
+    render: (row) => <StatusBadge status={row.status} />,
+  },
+  {
+    key: "time",
+    header: "When",
+    align: "right",
+    render: (row) => <span className="text-xs text-muted-foreground">{row.time}</span>,
+  },
+];
 
 export default function AutomationsPage() {
-  const rules = [
-    { name: "Welcome DM", trigger: "New Follower", action: "Send DM Template 1", active: true },
-    { name: "Comment Reply", trigger: "Comment contains 'link'", action: "Reply with link", active: false },
-  ];
+  // Local toggle state per automation so the switches feel live.
+  const [toggles, setToggles] = useState(() =>
+    Object.fromEntries(
+      automations.map((a) => [a.id, { active: a.active, requiresApproval: a.requiresApproval }])
+    )
+  );
+
+  const setToggle = (id: string, key: "active" | "requiresApproval", value: boolean) =>
+    setToggles((prev) => ({ ...prev, [id]: { ...prev[id], [key]: value } }));
+
+  const activeCount = Object.values(toggles).filter((t) => t.active).length;
+  const totalRuns = automations.reduce((sum, a) => sum + a.runs, 0);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <PageTitle title="Automations" description="Set up rules to handle comments and DMs automatically." />
-        <Button className="bg-slate-900 text-white hover:bg-slate-800">
-          <Plus className="mr-2 h-4 w-4" /> New Rule
-        </Button>
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Automations"
+        title="Smart, safe automation"
+        description="Approval-based DM and comment automations — no spam, always in your control."
+        icon={<Zap className="h-5 w-5" />}
+        actions={
+          <Button className="bg-gradient-to-r from-brand-500 to-coral-500 text-white shadow-sm shadow-brand-500/20 hover:opacity-95">
+            <Plus className="h-4 w-4" /> Create automation
+          </Button>
+        }
+      />
+
+      {/* Safety banner */}
+      <div className="flex items-start gap-4 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-brand-50/40 p-5">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-sm">
+          <Shield className="h-5 w-5" />
+        </div>
+        <div className="space-y-1">
+          <h2 className="text-sm font-semibold text-foreground">
+            Built to be safe, never spammy
+          </h2>
+          <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
+            Every automation is{" "}
+            <span className="font-medium text-foreground">approval-based and rate-limited</span> —
+            sensitive replies wait for your sign-off, sends are throttled to human-like pacing, and
+            nothing is ever mass-DMed. You stay in full control, and your accounts stay in good
+            standing.
+          </p>
+        </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {rules.map((rule, i) => (
-          <Card key={i} className={`bg-white/80 backdrop-blur-sm shadow-sm transition-all ${rule.active ? 'border-orange-200' : 'border-slate-200/60'}`}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-bold flex items-center justify-between">
-                {rule.name}
-                <div className={`h-2 w-2 rounded-full ${rule.active ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-              </CardTitle>
-              <CardDescription>If: {rule.trigger}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2 text-sm text-slate-700 bg-slate-50 p-2 rounded-md border border-slate-100">
-                <Zap className="h-4 w-4 text-orange-500" />
-                <ArrowRight className="h-4 w-4 text-slate-400 mx-1" />
-                <span>{rule.action}</span>
-              </div>
-              <div className="mt-4 flex justify-end">
-                <Button variant="outline" size="sm" className="text-xs">Edit Rule</Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+      {/* Stat row */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard
+          label="Active automations"
+          value={activeCount}
+          hint={`of ${automations.length} configured`}
+          icon={<Zap className="h-4 w-4" />}
+          accent="from-brand-500 to-coral-500"
+        />
+        <StatCard
+          label="Total runs"
+          value={totalRuns.toLocaleString()}
+          delta="+184"
+          positive
+          hint="all time"
+          icon={<Play className="h-4 w-4" />}
+          accent="from-sky-500 to-blue-500"
+        />
+        <StatCard
+          label="Pending approvals"
+          value={3}
+          hint="awaiting your review"
+          icon={<Clock4 className="h-4 w-4" />}
+          accent="from-amber-400 to-orange-500"
+        />
+        <StatCard
+          label="Leads captured"
+          value={248}
+          delta="+22.6%"
+          positive
+          hint="this month"
+          icon={<Users className="h-4 w-4" />}
+          accent="from-emerald-500 to-teal-500"
+        />
       </div>
+
+      {/* Your automations */}
+      <section className="space-y-4">
+        <SectionHeader
+          title="Your automations"
+          description="Toggle activation and approval requirements per workflow"
+          icon={<Zap className="h-4 w-4" />}
+        />
+        <div className="grid gap-4 lg:grid-cols-2">
+          {automations.map((a) => {
+            const meta = typeMeta[a.type as AutomationType];
+            const state = toggles[a.id];
+            return (
+              <div
+                key={a.id}
+                className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm transition-all hover:shadow-md"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-sm ${typeAccent[a.type as AutomationType]}`}
+                    >
+                      {meta.icon}
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-semibold text-foreground">{a.name}</h3>
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.chip}`}
+                      >
+                        {meta.label}
+                      </span>
+                    </div>
+                  </div>
+                  <StatusBadge status={state.active ? "active" : "inactive"} withDot />
+                </div>
+
+                <p className="text-sm leading-relaxed text-muted-foreground">{a.description}</p>
+
+                <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted/50 px-2.5 py-1 font-mono text-[11px] text-foreground/80">
+                    <Zap className="h-3 w-3 text-amber-500" /> {a.trigger}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <Play className="h-3.5 w-3.5" /> {a.runs.toLocaleString()} runs
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <Clock4 className="h-3.5 w-3.5" /> Last run {a.lastRun}
+                  </span>
+                </div>
+
+                <div className="mt-auto grid grid-cols-2 gap-3 border-t border-border pt-4">
+                  <label className="flex items-center justify-between gap-2 rounded-xl bg-muted/40 px-3 py-2.5">
+                    <span className="text-xs font-medium text-foreground">Active</span>
+                    <Switch
+                      checked={state.active}
+                      onCheckedChange={(v) => setToggle(a.id, "active", v)}
+                      aria-label={`Toggle ${a.name} active`}
+                    />
+                  </label>
+                  <label className="flex items-center justify-between gap-2 rounded-xl bg-muted/40 px-3 py-2.5">
+                    <span className="text-xs font-medium text-foreground">Require approval</span>
+                    <Switch
+                      checked={state.requiresApproval}
+                      onCheckedChange={(v) => setToggle(a.id, "requiresApproval", v)}
+                      aria-label={`Toggle ${a.name} approval requirement`}
+                    />
+                  </label>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Automation templates */}
+      <section className="space-y-4">
+        <SectionHeader
+          title="Automation templates"
+          description="Pre-built, safety-vetted workflows you can enable in one click"
+          icon={<Plus className="h-4 w-4" />}
+        />
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {templates.map((t) => (
+            <div
+              key={t.id}
+              className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+            >
+              <div
+                className={`flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-sm ${t.accent}`}
+              >
+                {t.icon}
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-sm font-semibold text-foreground">{t.name}</h3>
+                <p className="text-xs leading-relaxed text-muted-foreground">{t.desc}</p>
+              </div>
+              <Button variant="outline" size="sm" className="mt-auto">
+                Use template <ArrowRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Recent activity / logs */}
+      <section className="space-y-4">
+        <SectionHeader
+          title="Recent activity"
+          description="The latest automation runs and approval events"
+          icon={<Clock4 className="h-4 w-4" />}
+        />
+        <ChartCard title="Automation logs" subtitle="Most recent events" bodyClassName="p-0">
+          <DataTable
+            columns={logColumns}
+            data={automationLogs}
+            getRowKey={(row) => row.id}
+          />
+        </ChartCard>
+      </section>
     </div>
   );
 }

@@ -1,48 +1,65 @@
-import { Card, CardContent } from "@/components/ui/card";
+import { ArrowDownRight, ArrowUpRight } from "lucide-react";
+import { Sparkline } from "@/components/charts/sparkline";
 import { cn } from "@/lib/utils";
 
 interface StatCardProps {
-  title: string;
+  label: string;
   value: string | number;
-  description?: string;
+  delta?: string;
+  positive?: boolean;
+  hint?: string;
   icon?: React.ReactNode;
+  accent?: string;
+  spark?: number[];
   className?: string;
-  trend?: {
-    value: string;
-    isPositive: boolean;
-  };
 }
 
-export function StatCard({ title, value, description, icon, className, trend }: StatCardProps) {
+export function StatCard({
+  label,
+  value,
+  delta,
+  positive = true,
+  hint,
+  icon,
+  accent = "from-brand-500 to-coral-500",
+  spark,
+  className,
+}: StatCardProps) {
   return (
-    <Card className={cn("bg-white/80 backdrop-blur-md border-white shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 group relative overflow-hidden", className)}>
-      <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-      <CardContent className="p-6 relative z-10">
-        <div className="flex items-center justify-between space-y-0 pb-4">
-          <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">{title}</p>
-          {icon && (
-            <div className="h-10 w-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-500 group-hover:bg-gradient-to-br group-hover:from-orange-500 group-hover:to-coral-500 group-hover:text-white transition-all duration-300 shadow-sm">
-              {icon}
-            </div>
-          )}
-        </div>
-        <div className="flex flex-col gap-1">
-          <div className="flex items-baseline gap-2">
-            <div className="text-3xl font-bold text-slate-900 tracking-tight">{value}</div>
-            {trend && (
-              <span className={cn(
-                "px-2 py-0.5 rounded-full text-xs font-semibold",
-                trend.isPositive ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
-              )}>
-                {trend.value}
-              </span>
-            )}
+    <div
+      className={cn(
+        "group relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md",
+        className
+      )}
+    >
+      <div className="flex items-start justify-between">
+        <p className="text-sm font-medium text-muted-foreground">{label}</p>
+        {icon && (
+          <div className={cn("flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-sm", accent)}>
+            {icon}
           </div>
-          {description && (
-            <p className="text-xs text-slate-500 font-medium">{description}</p>
+        )}
+      </div>
+
+      <div className="mt-3 flex items-end justify-between gap-2">
+        <div className="flex items-baseline gap-2">
+          <span className="text-2xl font-bold tracking-tight text-foreground">{value}</span>
+          {delta && (
+            <span
+              className={cn(
+                "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-semibold",
+                positive ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
+              )}
+            >
+              {positive ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+              {delta}
+            </span>
           )}
         </div>
-      </CardContent>
-    </Card>
+        {spark && <Sparkline data={spark} className="opacity-80" color={positive ? "var(--chart-1)" : "var(--destructive)"} />}
+      </div>
+
+      {hint && <p className="mt-1.5 text-xs text-muted-foreground">{hint}</p>}
+    </div>
   );
 }

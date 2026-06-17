@@ -1,348 +1,393 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { PageTitle } from "@/components/ui/page-title";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import Link from "next/link";
+import {
+  ArrowLeft,
+  CalendarDays,
+  Sparkles,
+  Copy,
+  Heart,
+  MessageCircle,
+  Send,
+  Bookmark,
+  X,
+  Image as ImageIcon,
+  GalleryHorizontalEnd,
+  Video,
+  Type,
+  Hash,
+  MousePointerClick,
+  StickyNote,
+  Smartphone,
+  Wand2,
+} from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
+import { ChartCard } from "@/components/ui/chart-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Wand2, Image as ImageIcon, Send, Save, Loader2, Calendar } from "lucide-react";
-import { createPost } from "@/app/actions/posts";
-import { generateContent } from "@/app/actions/generate";
+import { Label } from "@/components/ui/label";
+import { Segmented } from "@/components/ui/segmented";
+import { UploadDropzone } from "@/components/ui/upload-dropzone";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { PlatformBadge } from "@/components/ui/platform-badge";
+import { PlatformIcon } from "@/components/ui/platform-icon";
+import { platformMeta, type Platform } from "@/lib/demo-data";
+import { cn } from "@/lib/utils";
 
-const PLATFORMS = [
-  { id: "linkedin", label: "LinkedIn", maxChars: 3000 },
-  { id: "x", label: "X (Twitter)", maxChars: 280 },
-  { id: "instagram", label: "Instagram", maxChars: 2200 },
-  { id: "threads", label: "Threads", maxChars: 500 },
-  { id: "tiktok", label: "TikTok", maxChars: 2200 },
+const POST_TYPES = [
+  { value: "carousel", label: "Carousel", icon: GalleryHorizontalEnd },
+  { value: "image", label: "Image", icon: ImageIcon },
+  { value: "video", label: "Video", icon: Video },
+  { value: "text", label: "Text", icon: Type },
+];
+
+const SCHEDULE_MODES = [
+  { value: "now", label: "Post now" },
+  { value: "queue", label: "Add to queue" },
+  { value: "custom", label: "Custom" },
+];
+
+const CHANNELS: Platform[] = ["instagram", "linkedin", "x", "tiktok", "youtube", "facebook"];
+
+const AI_ACTIONS = ["Generate hook", "Generate caption", "Generate hashtags", "Improve CTA"];
+
+const MEDIA_THUMBS = [
+  { id: "att1", gradient: "from-orange-400 to-rose-500", label: "cover.png" },
+  { id: "att2", gradient: "from-violet-500 to-indigo-600", label: "reel.mp4" },
+  { id: "att3", gradient: "from-sky-500 to-cyan-500", label: "carousel.zip" },
 ];
 
 export default function NewPostPage() {
-  const router = useRouter();
-  
-  // Form state
+  const [selectedChannels, setSelectedChannels] = useState<Set<Platform>>(
+    new Set<Platform>(["instagram", "linkedin"])
+  );
+  const [postType, setPostType] = useState("carousel");
+  const [captionTab, setCaptionTab] = useState("universal");
+  const [scheduleMode, setScheduleMode] = useState("queue");
+
   const [title, setTitle] = useState("");
-  const [topic, setTopic] = useState("");
-  const [postType, setPostType] = useState("text");
-  const [universalCaption, setUniversalCaption] = useState("");
-  const [linkedinCaption, setLinkedinCaption] = useState("");
-  const [instagramCaption, setInstagramCaption] = useState("");
-  const [hashtags, setHashtags] = useState("");
-  const [cta, setCta] = useState("");
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
-  
-  // UI state
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [message, setMessage] = useState<{type: 'success'|'error', text: string} | null>(null);
+  const [universalCaption, setUniversalCaption] = useState(
+    "We rebuilt our entire content system in a weekend — here's the exact playbook we used to ship 10x faster. 🚀"
+  );
+  const [igCaption, setIgCaption] = useState("");
+  const [liCaption, setLiCaption] = useState("");
+  const [attachments, setAttachments] = useState(MEDIA_THUMBS);
 
-  const togglePlatform = (id: string) => {
-    setSelectedPlatforms(prev => 
-      prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
-    );
+  const toggleChannel = (p: Platform) => {
+    setSelectedChannels((prev) => {
+      const next = new Set(prev);
+      if (next.has(p)) next.delete(p);
+      else next.add(p);
+      return next;
+    });
   };
 
-  const handleAiAssist = async () => {
-    if (!title.trim()) {
-      setMessage({ type: 'error', text: 'Please enter a title first to generate content.' });
-      return;
-    }
-    
-    setIsGenerating(true);
-    try {
-      const data = await generateContent("caption", title);
-      setUniversalCaption(data.content);
-    } catch (error) {
-      console.error(error);
-      setMessage({ type: 'error', text: 'Failed to generate content.' });
-    } finally {
-      setIsGenerating(false);
-    }
-  };
+  const removeAttachment = (id: string) =>
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
 
-  const handleSubmit = async (e: React.FormEvent, status: string) => {
-    e.preventDefault();
-    if (!title.trim()) {
-      setMessage({ type: 'error', text: 'Title is required.' });
-      return;
-    }
-
-    setIsSubmitting(true);
-    setMessage(null);
-
-    const formData = new FormData();
-    formData.append("title", title);
-    formData.append("topic", topic);
-    formData.append("post_type", postType);
-    formData.append("universal_caption", universalCaption);
-    formData.append("linkedin_caption", linkedinCaption);
-    formData.append("instagram_caption", instagramCaption);
-    formData.append("hashtags", hashtags);
-    formData.append("cta", cta);
-    formData.append("status", status);
-    
-    selectedPlatforms.forEach(p => formData.append("platforms", p));
-
-    try {
-      const result = await createPost(formData);
-      if (result.error) {
-        setMessage({ type: 'error', text: result.error });
-        setIsSubmitting(false);
-      } else {
-        setMessage({ type: 'success', text: 'Post saved successfully! Redirecting...' });
-        setTimeout(() => router.push("/posts"), 1500);
-      }
-    } catch (error) {
-      console.error(error);
-      setMessage({ type: 'error', text: 'An unexpected error occurred.' });
-      setIsSubmitting(false);
-    }
-  };
-
-  // Find lowest max char limit among selected platforms (default 2200 if none)
-  const maxChars = selectedPlatforms.length > 0 
-    ? Math.min(...PLATFORMS.filter(p => selectedPlatforms.includes(p.id)).map(p => p.maxChars))
-    : 2200;
+  const previewPlatform: Platform =
+    (Array.from(selectedChannels)[0] as Platform) ?? "instagram";
+  const previewCaption =
+    (previewPlatform === "instagram" && igCaption) ||
+    (previewPlatform === "linkedin" && liCaption) ||
+    universalCaption ||
+    "Your caption preview will appear here. Start typing to see it come to life across your selected channels.";
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-20">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <PageTitle 
-          title="Create New Post" 
-          description="Draft and schedule content across your platforms." 
-        />
-        <div className="flex items-center gap-3">
-          <Button 
-            variant="outline" 
-            onClick={(e) => handleSubmit(e, 'draft')}
-            disabled={isSubmitting}
-            className="bg-white"
-          >
-            <Save className="mr-2 h-4 w-4 text-slate-500" />
-            Save Draft
+    <div className="space-y-6">
+      <div>
+        <Link href="/posts">
+          <Button variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
+            <ArrowLeft className="h-4 w-4" /> Back to posts
           </Button>
-          <Button 
-            onClick={(e) => handleSubmit(e, 'ready')}
-            disabled={isSubmitting}
-            className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-md shadow-orange-500/20"
-          >
-            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Calendar className="mr-2 h-4 w-4" />}
-            Mark as Ready
-          </Button>
-        </div>
+        </Link>
       </div>
 
-      {message && (
-        <div className={`p-4 rounded-lg border ${message.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
-          {message.text}
-        </div>
-      )}
+      <PageHeader
+        title="New Post"
+        description="Compose, preview and schedule across channels."
+        actions={
+          <>
+            <Button variant="ghost">Save draft</Button>
+            <Button variant="outline">Mark ready</Button>
+            <Button className="bg-gradient-to-r from-brand-500 to-coral-500 text-white shadow-sm shadow-brand-500/20 hover:opacity-90">
+              <CalendarDays className="h-4 w-4" /> Schedule post
+            </Button>
+          </>
+        }
+      />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <Card className="bg-white/80 backdrop-blur-sm border-slate-200/60 shadow-sm">
-            <CardHeader>
-              <CardTitle>Post Details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="title">Post Title <span className="text-red-500">*</span></Label>
-                <Input 
-                  id="title" 
-                  placeholder="Internal name for this post" 
+      <div className="grid gap-6 lg:grid-cols-12">
+        {/* LEFT — editor */}
+        <div className="space-y-6 lg:col-span-8">
+          {/* Details */}
+          <ChartCard title="Details" subtitle="The essentials for this post">
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="post-title">Title</Label>
+                <Input
+                  id="post-title"
+                  placeholder="e.g. 5 AI tools every solo marketer needs"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="text-lg font-medium bg-slate-50/50"
                 />
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="topic">Topic / Category</Label>
-                  <Input 
-                    id="topic" 
-                    placeholder="e.g. Tips & Tricks" 
-                    value={topic}
-                    onChange={(e) => setTopic(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="postType">Format</Label>
-                  <Select value={postType} onValueChange={(val) => setPostType(val || "")}>
-                    <SelectTrigger id="postType">
-                      <SelectValue placeholder="Select format" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="text">Text / Thread</SelectItem>
-                      <SelectItem value="image">Single Image</SelectItem>
-                      <SelectItem value="carousel">Carousel</SelectItem>
-                      <SelectItem value="video">Short Video</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="post-topic">Topic</Label>
+                <Input id="post-topic" placeholder="e.g. AI workflows, content systems" />
               </div>
+              <div className="space-y-1.5">
+                <Label>Post type</Label>
+                <Segmented options={POST_TYPES} value={postType} onValueChange={setPostType} />
+              </div>
+            </div>
+          </ChartCard>
 
-              <div className="space-y-2 pt-2">
-                <div className="flex items-center justify-between">
-                  <Label>Target Platforms</Label>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {PLATFORMS.map((platform) => {
-                    const isSelected = selectedPlatforms.includes(platform.id);
-                    return (
-                      <Badge 
-                        key={platform.id}
-                        variant={isSelected ? "default" : "outline"}
-                        className={`cursor-pointer px-3 py-1.5 text-sm transition-all ${
-                          isSelected 
-                            ? "bg-slate-900 text-white hover:bg-slate-800" 
-                            : "bg-white text-slate-600 hover:bg-slate-50 border-slate-200"
-                        }`}
-                        onClick={() => togglePlatform(platform.id)}
+          {/* Channels */}
+          <ChartCard
+            title="Channels"
+            subtitle="Pick where this post goes live"
+            action={
+              <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-600">
+                {selectedChannels.size} selected
+              </span>
+            }
+          >
+            <div className="flex flex-wrap gap-2">
+              {CHANNELS.map((p) => {
+                const active = selectedChannels.has(p);
+                const meta = platformMeta[p];
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => toggleChannel(p)}
+                    aria-pressed={active}
+                    className={cn(
+                      "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-all",
+                      active
+                        ? "border-transparent bg-gradient-to-r from-brand-500 to-coral-500 text-white shadow-sm shadow-brand-500/20"
+                        : "border-border bg-card text-muted-foreground hover:border-brand-200 hover:text-foreground"
+                    )}
+                  >
+                    <PlatformIcon platform={p} className="h-4 w-4" />
+                    {meta.label}
+                  </button>
+                );
+              })}
+            </div>
+          </ChartCard>
+
+          {/* Captions */}
+          <ChartCard title="Captions" subtitle="Tailor copy per platform">
+            <Tabs value={captionTab} onValueChange={(v) => setCaptionTab(v as string)}>
+              <TabsList>
+                <TabsTrigger value="universal">Universal</TabsTrigger>
+                <TabsTrigger value="instagram">Instagram</TabsTrigger>
+                <TabsTrigger value="linkedin">LinkedIn</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="universal" className="mt-3">
+                <Textarea
+                  rows={5}
+                  placeholder="A single caption used everywhere unless overridden…"
+                  value={universalCaption}
+                  onChange={(e) => setUniversalCaption(e.target.value)}
+                />
+                <p className="mt-1.5 text-right text-[11px] text-muted-foreground">
+                  {universalCaption.length} characters
+                </p>
+              </TabsContent>
+
+              <TabsContent value="instagram" className="mt-3">
+                <Textarea
+                  rows={5}
+                  placeholder="Punchy caption with emoji & line breaks for Instagram…"
+                  value={igCaption}
+                  onChange={(e) => setIgCaption(e.target.value)}
+                />
+                <p className="mt-1.5 text-right text-[11px] text-muted-foreground">
+                  {igCaption.length} / 2,200 characters
+                </p>
+              </TabsContent>
+
+              <TabsContent value="linkedin" className="mt-3">
+                <Textarea
+                  rows={5}
+                  placeholder="Authority-building post with a strong hook for LinkedIn…"
+                  value={liCaption}
+                  onChange={(e) => setLiCaption(e.target.value)}
+                />
+                <p className="mt-1.5 text-right text-[11px] text-muted-foreground">
+                  {liCaption.length} / 3,000 characters
+                </p>
+              </TabsContent>
+            </Tabs>
+          </ChartCard>
+
+          {/* Hashtags / CTA / Notes */}
+          <ChartCard title="Optimization" subtitle="Hashtags, CTA and internal notes">
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="hashtags" className="gap-1.5">
+                  <Hash className="h-3.5 w-3.5 text-muted-foreground" /> Hashtags
+                </Label>
+                <Textarea
+                  id="hashtags"
+                  rows={2}
+                  defaultValue="#contentmarketing #creators #socialmedia #aitools"
+                  placeholder="#contentmarketing #creators #aitools"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="cta" className="gap-1.5">
+                  <MousePointerClick className="h-3.5 w-3.5 text-muted-foreground" /> Call to action
+                </Label>
+                <Input id="cta" placeholder="Follow for more content systems →" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="notes" className="gap-1.5">
+                  <StickyNote className="h-3.5 w-3.5 text-muted-foreground" /> Internal notes
+                </Label>
+                <Textarea
+                  id="notes"
+                  rows={2}
+                  placeholder="Notes for your team — context, approvals, reminders…"
+                />
+              </div>
+            </div>
+          </ChartCard>
+
+          {/* Media */}
+          <ChartCard title="Media" subtitle="Attach images, video or carousels">
+            <div className="space-y-4">
+              <UploadDropzone hint="Drop media for this post — images, video, ZIPs up to 200MB" />
+              {attachments.length > 0 && (
+                <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
+                  {attachments.map((a) => (
+                    <div key={a.id} className="group/thumb relative">
+                      <div
+                        className={cn(
+                          "aspect-square w-full rounded-xl bg-gradient-to-br shadow-sm",
+                          a.gradient
+                        )}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(a.id)}
+                        aria-label={`Remove ${a.label}`}
+                        className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm transition-colors hover:bg-destructive/10 hover:text-destructive"
                       >
-                        {platform.label}
-                      </Badge>
-                    );
-                  })}
+                        <X className="h-3 w-3" />
+                      </button>
+                      <p className="mt-1 truncate text-[10px] text-muted-foreground">{a.label}</p>
+                    </div>
+                  ))}
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/80 backdrop-blur-sm border-slate-200/60 shadow-sm">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle>Content</CardTitle>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleAiAssist}
-                  disabled={isGenerating}
-                  className="text-orange-600 border-orange-200 hover:bg-orange-50 hover:text-orange-700"
-                >
-                  {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-                  AI Assist
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="universal" className="w-full">
-                <TabsList className="w-full justify-start border-b border-slate-100 rounded-none bg-transparent h-auto p-0 mb-4 space-x-6">
-                  <TabsTrigger value="universal" className="rounded-none border-b-2 border-transparent data-[state=active]:border-orange-500 data-[state=active]:bg-transparent data-[state=active]:shadow-none px-0 py-2">
-                    Universal Caption
-                  </TabsTrigger>
-                  <TabsTrigger value="linkedin" className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-500 data-[state=active]:bg-transparent data-[state=active]:shadow-none px-0 py-2">
-                    LinkedIn Override
-                  </TabsTrigger>
-                  <TabsTrigger value="instagram" className="rounded-none border-b-2 border-transparent data-[state=active]:border-pink-500 data-[state=active]:bg-transparent data-[state=active]:shadow-none px-0 py-2">
-                    Instagram Override
-                  </TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="universal" className="mt-0">
-                  <div className="space-y-2">
-                    <Textarea 
-                      placeholder="Write your caption here..." 
-                      className="min-h-[250px] resize-y bg-slate-50/50"
-                      value={universalCaption}
-                      onChange={(e) => setUniversalCaption(e.target.value)}
-                    />
-                    <div className="flex justify-between text-xs text-slate-500">
-                      <span>Will be used for all platforms unless overridden.</span>
-                      <span className={`${universalCaption.length > maxChars ? 'text-red-500 font-semibold' : ''}`}>
-                        {universalCaption.length} / {maxChars}
-                      </span>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="linkedin" className="mt-0">
-                  <div className="space-y-2">
-                    <Textarea 
-                      placeholder="LinkedIn specific formatting goes here..." 
-                      className="min-h-[250px] resize-y bg-blue-50/30 border-blue-100 focus-visible:ring-blue-500"
-                      value={linkedinCaption}
-                      onChange={(e) => setLinkedinCaption(e.target.value)}
-                    />
-                    <div className="flex justify-end text-xs text-slate-500">
-                      <span className={`${linkedinCaption.length > 3000 ? 'text-red-500 font-semibold' : ''}`}>
-                        {linkedinCaption.length} / 3000
-                      </span>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="instagram" className="mt-0">
-                  <div className="space-y-2">
-                    <Textarea 
-                      placeholder="Instagram specific formatting goes here..." 
-                      className="min-h-[250px] resize-y bg-pink-50/30 border-pink-100 focus-visible:ring-pink-500"
-                      value={instagramCaption}
-                      onChange={(e) => setInstagramCaption(e.target.value)}
-                    />
-                    <div className="flex justify-end text-xs text-slate-500">
-                      <span className={`${instagramCaption.length > 2200 ? 'text-red-500 font-semibold' : ''}`}>
-                        {instagramCaption.length} / 2200
-                      </span>
-                    </div>
-                  </div>
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
+              )}
+            </div>
+          </ChartCard>
         </div>
 
-        <div className="space-y-6">
-          <Card className="bg-white/80 backdrop-blur-sm border-slate-200/60 shadow-sm">
-            <CardHeader>
-              <CardTitle>Media</CardTitle>
-              <CardDescription>Attach files to this post</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="border-2 border-dashed border-slate-200 rounded-xl p-8 flex flex-col items-center justify-center text-center hover:bg-slate-50 hover:border-slate-300 transition-colors cursor-pointer group">
-                <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                  <ImageIcon className="h-6 w-6 text-slate-400 group-hover:text-slate-500" />
+        {/* RIGHT — sidebar */}
+        <div className="space-y-6 lg:col-span-4 lg:sticky lg:top-20 lg:self-start">
+          {/* Preview */}
+          <ChartCard title="Preview" subtitle="How it looks once published">
+            <div className="mx-auto max-w-[280px] rounded-3xl border border-border bg-card p-3 shadow-sm">
+              <div className="mb-3 flex items-center justify-between">
+                <PlatformBadge platform={previewPlatform} />
+                <Smartphone className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div className="mb-3 flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-coral-500 text-xs font-semibold text-white">
+                  RS
                 </div>
-                <p className="text-sm font-medium text-slate-700">Click to upload media</p>
-                <p className="text-xs text-slate-500 mt-1">or drag and drop files here</p>
-                <p className="text-[10px] text-slate-400 mt-4 uppercase tracking-wider font-semibold">Phase 2 feature</p>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-foreground">Rivera Studio</p>
+                  <p className="text-[10px] text-muted-foreground">@riverastudio · now</p>
+                </div>
               </div>
-            </CardContent>
-          </Card>
+              <p className="mb-3 line-clamp-4 whitespace-pre-wrap text-xs leading-relaxed text-foreground">
+                {previewCaption}
+              </p>
+              <div className="aspect-[4/5] w-full rounded-2xl bg-gradient-to-br from-brand-500 via-coral-400 to-amber-400 shadow-sm" />
+              <div className="mt-3 flex items-center gap-4 text-muted-foreground">
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium">
+                  <Heart className="h-4 w-4" /> 1.2K
+                </span>
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium">
+                  <MessageCircle className="h-4 w-4" /> 86
+                </span>
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium">
+                  <Send className="h-4 w-4" /> 24
+                </span>
+                <Bookmark className="ml-auto h-4 w-4" />
+              </div>
+            </div>
+          </ChartCard>
 
-          <Card className="bg-white/80 backdrop-blur-sm border-slate-200/60 shadow-sm">
-            <CardHeader>
-              <CardTitle>Metadata</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="hashtags">Hashtags</Label>
-                <Textarea 
-                  id="hashtags" 
-                  placeholder="#marketing #growth..." 
-                  className="h-20 bg-slate-50/50"
-                  value={hashtags}
-                  onChange={(e) => setHashtags(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cta">Call to Action</Label>
-                <Input 
-                  id="cta" 
-                  placeholder="e.g. Link in bio!" 
-                  className="bg-slate-50/50"
-                  value={cta}
-                  onChange={(e) => setCta(e.target.value)}
-                />
-              </div>
-            </CardContent>
-          </Card>
+          {/* AI assist */}
+          <ChartCard
+            title="AI assist"
+            subtitle="Let SocialFlow AI draft for you"
+            action={<Wand2 className="h-4 w-4 text-brand-500" />}
+          >
+            <div className="space-y-2">
+              {AI_ACTIONS.map((label) => (
+                <Button key={label} variant="outline" className="w-full justify-start">
+                  <Sparkles className="h-4 w-4 text-brand-500" /> {label}
+                </Button>
+              ))}
+              <p className="pt-1 text-center text-[11px] text-muted-foreground">
+                Powered by SocialFlow AI
+              </p>
+            </div>
+          </ChartCard>
+
+          {/* Schedule */}
+          <ChartCard title="Schedule" subtitle="Choose when this goes out">
+            <div className="space-y-4">
+              <Segmented
+                options={SCHEDULE_MODES}
+                value={scheduleMode}
+                onValueChange={setScheduleMode}
+                className="w-full"
+                size="sm"
+              />
+
+              {scheduleMode === "custom" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="sched-date">Date</Label>
+                    <Input id="sched-date" type="date" defaultValue="2026-06-18" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="sched-time">Time</Label>
+                    <Input id="sched-time" type="time" defaultValue="09:00" />
+                  </div>
+                </div>
+              )}
+
+              {scheduleMode === "now" && (
+                <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
+                  This post will publish immediately to {selectedChannels.size} channel
+                  {selectedChannels.size === 1 ? "" : "s"}.
+                </p>
+              )}
+
+              {scheduleMode === "queue" && (
+                <p className="rounded-lg bg-brand-50 px-3 py-2 text-xs font-medium text-brand-700">
+                  Added to your queue — published at your next optimal time slot.
+                </p>
+              )}
+
+              <Button variant="outline" className="w-full">
+                <Copy className="h-4 w-4" /> Export / copy manually
+              </Button>
+            </div>
+          </ChartCard>
         </div>
       </div>
     </div>

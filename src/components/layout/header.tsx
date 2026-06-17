@@ -1,61 +1,145 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { Bell, Search, User } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  Menu,
+  Bell,
+  Plus,
+  ChevronDown,
+  Sparkles,
+  Lightbulb,
+  UploadCloud,
+  PenSquare,
+  Check,
+} from "lucide-react";
+import { CommandBar } from "@/components/ui/command-bar";
+import { notifications } from "@/lib/demo-data";
+import { cn } from "@/lib/utils";
 
-export function Header() {
-  const [email, setEmail] = useState<string | null>(null);
+const createOptions = [
+  { title: "New post", desc: "Compose & schedule", href: "/posts/new", icon: PenSquare },
+  { title: "Generate content", desc: "AI content tools", href: "/content-studio", icon: Sparkles },
+  { title: "New idea", desc: "Add to backlog", href: "/ideas", icon: Lightbulb },
+  { title: "Upload media", desc: "Add assets", href: "/media", icon: UploadCloud },
+];
 
-  useEffect(() => {
-    const getUser = async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) setEmail(user.email ?? "");
-    };
-    getUser();
-  }, []);
+const notifKindColor: Record<string, string> = {
+  success: "bg-emerald-100 text-emerald-600",
+  inbox: "bg-sky-100 text-sky-600",
+  trend: "bg-amber-100 text-amber-600",
+  ai: "bg-brand-100 text-brand-600",
+};
+
+export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
+  const router = useRouter();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const unread = notifications.filter((n) => n.unread).length;
 
   return (
-    <header className="h-16 border-b border-slate-200/60 bg-white/70 backdrop-blur-md sticky top-0 z-10 flex items-center justify-between px-6 shadow-sm">
-      <div className="flex-1 max-w-md">
-        <div className="relative group">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-orange-500 transition-colors" />
-          <Input 
-            placeholder="Search..." 
-            className="pl-9 bg-slate-100 border-transparent rounded-full w-full focus-visible:ring-orange-500/20 focus-visible:bg-white transition-all shadow-none"
-          />
-        </div>
+    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between gap-3 border-b border-border bg-card/80 px-4 backdrop-blur-md lg:px-6">
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onMenuClick}
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted lg:hidden"
+          aria-label="Open menu"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <CommandBar className="md:w-72" />
       </div>
-      
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="text-slate-500 hover:text-slate-700 relative transition-colors rounded-full">
-            <Bell className="h-5 w-5" />
-            <span className="absolute top-1.5 right-2 h-2 w-2 rounded-full bg-orange-500 border-2 border-white shadow-sm shadow-orange-500/50"></span>
-          </Button>
-          <Button variant="ghost" size="icon" className="text-slate-500 hover:text-slate-700 transition-colors rounded-full hidden sm:flex">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-          </Button>
+
+      <div className="flex items-center gap-2">
+        {/* Quick create */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => {
+              setCreateOpen((o) => !o);
+              setNotifOpen(false);
+            }}
+            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-gradient-to-r from-brand-500 to-coral-500 pl-3 pr-2.5 text-sm font-semibold text-white shadow-sm shadow-brand-500/20 transition-opacity hover:opacity-95"
+          >
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Create</span>
+            <ChevronDown className="h-3.5 w-3.5 opacity-80" />
+          </button>
+          {createOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setCreateOpen(false)} />
+              <div className="absolute right-0 z-20 mt-2 w-64 overflow-hidden rounded-2xl border border-border bg-card p-1.5 shadow-xl">
+                {createOptions.map((o) => (
+                  <button
+                    key={o.href}
+                    onClick={() => {
+                      setCreateOpen(false);
+                      router.push(o.href);
+                    }}
+                    className="flex w-full items-center gap-3 rounded-xl p-2.5 text-left transition-colors hover:bg-muted"
+                  >
+                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
+                      <o.icon className="h-4 w-4" />
+                    </span>
+                    <span>
+                      <span className="block text-sm font-medium text-foreground">{o.title}</span>
+                      <span className="block text-[11px] text-muted-foreground">{o.desc}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
-        
-        <div className="h-6 w-px bg-slate-200/60 mx-1"></div>
-        
-        <div className="flex items-center gap-3 cursor-pointer group px-2 py-1 rounded-full hover:bg-slate-50 transition-colors">
-          <div className="h-9 w-9 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center border border-slate-200 shadow-sm overflow-hidden group-hover:border-orange-200 transition-colors">
-            <User className="h-5 w-5 text-slate-500 group-hover:text-orange-500 transition-colors" />
-          </div>
-          <div className="text-left hidden sm:block">
-            <p className="text-sm font-semibold text-slate-900 leading-none group-hover:text-orange-600 transition-colors">{email?.split('@')[0] || 'User'}</p>
-            <p className="text-xs text-slate-500 mt-1">Premium User</p>
-          </div>
-          <svg className="w-4 h-4 text-slate-400 group-hover:text-slate-600 ml-1 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
+
+        {/* Notifications */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => {
+              setNotifOpen((o) => !o);
+              setCreateOpen(false);
+            }}
+            className="relative flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted"
+            aria-label="Notifications"
+          >
+            <Bell className="h-5 w-5" />
+            {unread > 0 && (
+              <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-500 px-1 text-[9px] font-bold text-white ring-2 ring-card">
+                {unread}
+              </span>
+            )}
+          </button>
+          {notifOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setNotifOpen(false)} />
+              <div className="absolute right-0 z-20 mt-2 w-80 overflow-hidden rounded-2xl border border-border bg-card shadow-xl">
+                <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                  <p className="text-sm font-semibold text-foreground">Notifications</p>
+                  <button className="text-xs font-medium text-brand-600 hover:underline">Mark all read</button>
+                </div>
+                <div className="max-h-80 overflow-y-auto scrollbar-thin">
+                  {notifications.map((n) => (
+                    <div key={n.id} className={cn("flex gap-3 px-4 py-3 transition-colors hover:bg-muted/50", n.unread && "bg-brand-50/30")}>
+                      <span className={cn("mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", notifKindColor[n.kind] ?? "bg-muted text-muted-foreground")}>
+                        {n.kind === "success" ? <Check className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-foreground">{n.title}</p>
+                        <p className="line-clamp-2 text-xs text-muted-foreground">{n.body}</p>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground/70">{n.time}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <Link href="/inbox" onClick={() => setNotifOpen(false)} className="block border-t border-border px-4 py-2.5 text-center text-xs font-semibold text-brand-600 hover:bg-muted/50">
+                  Open inbox
+                </Link>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </header>

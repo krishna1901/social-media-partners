@@ -1,221 +1,275 @@
-import { createClient } from "@/lib/supabase/server";
-import { PageTitle } from "@/components/ui/page-title";
-import { StatCard } from "@/components/ui/stat-card";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { Lightbulb, Send, Calendar, MessageSquare, Plus, PenSquare, Image as ImageIcon, Edit2, Trash2, Check, TrendingUp, Bot } from "lucide-react";
 import Link from "next/link";
+import {
+  PenSquare,
+  FileText,
+  CalendarDays,
+  Sparkles,
+  Inbox,
+  TrendingUp,
+  Flame,
+  Clock,
+  ArrowUpRight,
+} from "lucide-react";
+import { StatCard } from "@/components/ui/stat-card";
+import { ChartCard } from "@/components/ui/chart-card";
+import { InsightCard } from "@/components/ui/insight-card";
+import { ActivityFeed } from "@/components/ui/activity-feed";
+import { QuickActions } from "@/components/ui/quick-actions";
+import { PlatformChip } from "@/components/ui/platform-badge";
+import { ContentTypeBadge } from "@/components/ui/content-type-badge";
+import { AreaChart } from "@/components/charts/area-chart";
+import { BarChart } from "@/components/charts/bar-chart";
+import { DonutChart } from "@/components/charts/donut-chart";
 import { Button } from "@/components/ui/button";
+import {
+  currentUser,
+  dashboardStats,
+  weeklyPerformance,
+  platformBreakdown,
+  engagementTrend,
+  contentTypePerformance,
+  recentDrafts,
+  upcomingPosts,
+  trendingNow,
+  recentGenerations,
+  activityFeed,
+  smartRecommendations,
+} from "@/lib/demo-data";
 
-export default async function DashboardPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+const statMeta: Record<string, { icon: React.ReactNode; accent: string }> = {
+  "total-posts": { icon: <PenSquare className="h-4 w-4" />, accent: "from-brand-500 to-coral-500" },
+  drafts: { icon: <FileText className="h-4 w-4" />, accent: "from-slate-500 to-slate-700" },
+  scheduled: { icon: <CalendarDays className="h-4 w-4" />, accent: "from-amber-400 to-orange-500" },
+  "ai-generated": { icon: <Sparkles className="h-4 w-4" />, accent: "from-violet-500 to-indigo-500" },
+  inbox: { icon: <Inbox className="h-4 w-4" />, accent: "from-sky-500 to-blue-500" },
+  engagement: { icon: <TrendingUp className="h-4 w-4" />, accent: "from-emerald-500 to-teal-500" },
+};
 
-  const [ideasResp, postsResp, scheduledResp] = await Promise.all([
-    supabase.from("content_ideas").select("id", { count: "exact" }),
-    supabase.from("posts").select("id"),
-    supabase.from("posts").select("id").eq("status", "scheduled"),
-  ]);
+const recIcon: Record<string, React.ReactNode> = {
+  trend: <TrendingUp className="h-4 w-4" />,
+  clock: <Clock className="h-4 w-4" />,
+  inbox: <Inbox className="h-4 w-4" />,
+};
+const recTone: Record<string, "brand" | "warning" | "success"> = { r1: "brand", r2: "warning", r3: "success" };
 
-  const recentPosts = await supabase
-    .from("posts")
-    .select("*")
-    .order("updated_at", { ascending: false })
-    .limit(5);
-
-  const getPlatformIcon = (platform: string) => {
-    switch (platform) {
-      case 'Instagram': return (
-        <svg className="h-4 w-4 text-pink-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-          <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-          <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
-        </svg>
-      );
-      case 'Twitter': return (
-        <svg className="h-4 w-4 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M23 3a10.9 10.9 0 0 1-3.14 1.53 4.48 4.48 0 0 0-7.86 3v1A10.66 10.66 0 0 1 3 4s-4 9 5 13a11.64 11.64 0 0 1-7 2c9 5 20 0 20-11.5a4.5 4.5 0 0 0-.08-.83A7.72 7.72 0 0 0 23 3z"></path>
-        </svg>
-      );
-      case 'LinkedIn': return (
-        <svg className="h-4 w-4 text-blue-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
-          <rect x="2" y="9" width="4" height="12"></rect>
-          <circle cx="4" cy="4" r="2"></circle>
-        </svg>
-      );
-      default: return (
-        <svg className="h-4 w-4 text-blue-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
-          <rect x="2" y="9" width="4" height="12"></rect>
-          <circle cx="4" cy="4" r="2"></circle>
-        </svg>
-      );
-    }
-  };
-
-  const getDummyPlatform = (index: number) => {
-    const platforms = ['Instagram', 'Twitter', 'LinkedIn'];
-    return platforms[index % platforms.length];
-  };
-
-  const getDummyScore = (index: number) => [92, 88, 75, 81, 95][index % 5];
-
-  const activityFeed = [
-    { id: 1, user: "Sarah J.", action: "wrote a new draft", item: "Winter Collection Launch", time: "2m ago" },
-    { id: 2, user: "Alex T.", action: "approved", item: "AI Tech Tips", time: "1h ago" },
-    { id: 3, user: "Sarah J.", action: "scheduled", item: "Q4 Roadmap", time: "3h ago" },
-    { id: 4, user: "Mike R.", action: "left a comment on", item: "Holiday Promo", time: "5h ago" },
-  ];
+export default function DashboardPage() {
+  const today = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        {/* We keep the PageTitle simple, but we don't really need it if we have no hero in the dashboard mockup. The mockup has no title on top of stats. Let's just remove it and let stats be top, or keep it. I'll keep it for context. */}
-        <PageTitle 
-          title={`Welcome back, ${user?.email?.split('@')[0] || 'Creator'}!`} 
-          description="Here's what's happening with your content today." 
-        />
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard 
-          title="Total Posts" 
-          value={postsResp.data?.length || 4812} 
-          trend={{ value: "+12%", isPositive: true }}
-          icon={<div className="h-10 w-10 rounded-xl bg-gradient-to-br from-orange-400 to-orange-500 flex items-center justify-center shadow-sm"><PenSquare className="h-5 w-5 text-white" /></div>}
-        />
-        <StatCard 
-          title="Scheduled" 
-          value={scheduledResp.data?.length || 185} 
-          trend={{ value: "+5%", isPositive: true }}
-          icon={<div className="h-10 w-10 rounded-xl bg-gradient-to-br from-coral-400 to-coral-500 flex items-center justify-center shadow-sm"><Calendar className="h-5 w-5 text-white" /></div>}
-        />
-        <StatCard 
-          title="Engagement" 
-          value="9.2%" 
-          trend={{ value: "+0.8%", isPositive: true }}
-          icon={<div className="h-10 w-10 rounded-xl bg-gradient-to-br from-orange-500 to-red-400 flex items-center justify-center shadow-sm"><TrendingUp className="h-5 w-5 text-white" /></div>}
-        />
-        <StatCard 
-          title="AI-Generated" 
-          value="1,208" 
-          trend={{ value: "+18%", isPositive: true }}
-          icon={<div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-sm"><Bot className="h-5 w-5 text-white" /></div>}
-        />
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="col-span-2 bg-white/80 backdrop-blur-md border-slate-200/60 shadow-lg shadow-slate-200/20 rounded-2xl overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between bg-white/50 border-b border-slate-100 pb-4">
-            <CardTitle className="text-xl font-bold text-slate-800">Recent Content Drafts</CardTitle>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-sm rounded-full px-4">
-                <Plus className="mr-2 h-4 w-4" /> New Post
-              </Button>
-              <Button size="sm" className="bg-gradient-to-r from-orange-400 to-coral-500 hover:from-orange-500 hover:to-coral-600 text-white shadow-md shadow-orange-500/20 border-0 rounded-full px-4">
-                Approve All
-              </Button>
+    <div className="space-y-6">
+      {/* Hero */}
+      <section className="relative overflow-hidden rounded-3xl bg-sidebar p-6 text-white sm:p-8">
+        <div className="absolute -right-10 -top-16 h-56 w-56 rounded-full bg-brand-500/30 blur-3xl" />
+        <div className="absolute -bottom-20 right-1/3 h-56 w-56 rounded-full bg-coral-500/20 blur-3xl" />
+        <div className="bg-grid absolute inset-0 opacity-40" />
+        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-sm font-medium text-white/50">{today}</p>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
+              Welcome back, {currentUser.name.split(" ")[0]} 👋
+            </h1>
+            <p className="mt-2 max-w-lg text-sm text-white/70">
+              You have <span className="font-semibold text-white">3 posts scheduled</span> today,{" "}
+              <span className="font-semibold text-white">23 unread messages</span>, and{" "}
+              <span className="font-semibold text-white">4 AI drafts</span> ready to review.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-2.5">
+              <Link href="/posts/new">
+                <Button className="bg-white text-sidebar hover:bg-white/90">
+                  <PenSquare className="h-4 w-4" /> Create post
+                </Button>
+              </Link>
+              <Link href="/content-studio">
+                <Button variant="outline" className="border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white">
+                  <Sparkles className="h-4 w-4" /> Generate with AI
+                </Button>
+              </Link>
             </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            {recentPosts.data?.length === 0 ? (
-              <div className="text-center py-12 text-slate-500 text-sm">
-                No recent activity. Start drafting some posts!
+          </div>
+          <div className="grid grid-cols-3 gap-3 lg:gap-4">
+            {[
+              { label: "Today's reach", value: "18.4K", trend: "+12%" },
+              { label: "Posts live", value: "7", trend: "+3" },
+              { label: "Eng. rate", value: "6.8%", trend: "+0.9%" },
+            ].map((s) => (
+              <div key={s.label} className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
+                <p className="text-[11px] font-medium text-white/50">{s.label}</p>
+                <p className="mt-1 text-xl font-bold">{s.value}</p>
+                <p className="mt-0.5 inline-flex items-center gap-0.5 text-[11px] font-semibold text-emerald-300">
+                  <ArrowUpRight className="h-3 w-3" /> {s.trend}
+                </p>
               </div>
-            ) : (
-              <div className="w-full overflow-x-auto">
-                <table className="w-full text-sm text-left text-slate-600">
-                  <thead className="text-xs text-slate-500 bg-slate-50/50 uppercase font-medium">
-                    <tr>
-                      <th className="px-6 py-4">Title</th>
-                      <th className="px-6 py-4">Platform</th>
-                      <th className="px-6 py-4">Status</th>
-                      <th className="px-6 py-4">AI Score</th>
-                      <th className="px-6 py-4">Created Date</th>
-                      <th className="px-6 py-4 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {recentPosts.data?.map((post, i) => {
-                      const platform = getDummyPlatform(i);
-                      return (
-                        <tr key={post.id} className="hover:bg-slate-50/80 transition-colors group">
-                          <td className="px-6 py-4 font-medium text-slate-900">{post.title}</td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-2">
-                              {getPlatformIcon(platform)}
-                              <span className="font-medium text-slate-700">{platform}</span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <StatusBadge status={i === 1 ? 'review' : post.status} />
-                          </td>
-                          <td className="px-6 py-4 font-medium text-slate-900">{getDummyScore(i)}</td>
-                          <td className="px-6 py-4 text-slate-500">
-                            {new Date(post.created_at || post.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-slate-600">
-                                <ImageIcon className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-slate-600">
-                                <Edit2 className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            ))}
+          </div>
+        </div>
+      </section>
 
-        {/* Activity Feed */}
-        <Card className="col-span-1 bg-white/80 backdrop-blur-md border-slate-200/60 shadow-lg shadow-slate-200/20 rounded-2xl">
-          <CardHeader className="bg-white/50 border-b border-slate-100 pb-4">
-            <CardTitle className="text-xl font-bold text-slate-800">Activity Feed</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <div className="space-y-6">
-              {activityFeed.map((activity, i) => (
-                <div key={activity.id} className="flex gap-4 relative">
-                  {i !== activityFeed.length - 1 && (
-                    <div className="absolute left-4 top-10 bottom-[-1.5rem] w-px bg-slate-200" />
-                  )}
-                  <div className="h-8 w-8 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex-shrink-0 flex items-center justify-center border border-white shadow-sm z-10">
-                    <MessageSquare className="h-3.5 w-3.5 text-slate-500" />
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+        {dashboardStats.map((s) => (
+          <StatCard
+            key={s.key}
+            label={s.label}
+            value={s.value}
+            delta={s.delta}
+            positive={s.positive}
+            hint={s.hint}
+            icon={statMeta[s.key]?.icon}
+            accent={statMeta[s.key]?.accent}
+          />
+        ))}
+      </div>
+
+      {/* Performance + platform breakdown */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <ChartCard
+          title="Weekly Content Performance"
+          subtitle="Posts published per day this week"
+          className="lg:col-span-2"
+          action={<span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">+18% vs last week</span>}
+          footer={<span>65 posts published · 38.2K total engagements this week</span>}
+        >
+          <BarChart data={weeklyPerformance.map((d) => ({ label: d.label, value: d.published }))} showValues height={200} />
+        </ChartCard>
+
+        <ChartCard title="Platform Breakdown" subtitle="Share of published content">
+          <DonutChart data={platformBreakdown} centerLabel="1,284" centerSublabel="Total posts" size={150} />
+        </ChartCard>
+      </div>
+
+      {/* Engagement trend + content type + recommendations */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <ChartCard title="Engagement Trend" subtitle="8-week engagement rate (%)">
+          <AreaChart data={engagementTrend} height={200} valueFormatter={(n) => `${n}%`} />
+        </ChartCard>
+
+        <ChartCard title="Content Type Performance" subtitle="Avg. engagement rate by format">
+          <BarChart
+            data={contentTypePerformance}
+            height={200}
+            showValues
+            valueFormatter={(n) => `${n}%`}
+            barClassName="from-violet-500 to-indigo-400 group-hover:from-violet-600 group-hover:to-indigo-500"
+          />
+        </ChartCard>
+
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-foreground">Smart Recommendations</h2>
+            <Sparkles className="h-4 w-4 text-brand-500" />
+          </div>
+          {smartRecommendations.map((r) => (
+            <InsightCard
+              key={r.id}
+              title={r.title}
+              body={r.body}
+              impact={r.impact}
+              tone={recTone[r.id]}
+              icon={recIcon[r.icon]}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Drafts / Upcoming / Trending */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <ChartCard
+          title="Recent Drafts"
+          action={<Link href="/posts" className="text-xs font-semibold text-brand-600 hover:underline">View all</Link>}
+          bodyClassName="p-0"
+        >
+          <ul className="divide-y divide-border">
+            {recentDrafts.map((d) => (
+              <li key={d.id}>
+                <Link href="/posts" className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-muted/40">
+                  <PlatformChip platform={d.platform} />
+                  <div className="min-w-0 flex-1">
+                    <p className="line-clamp-1 text-sm font-medium text-foreground">{d.title}</p>
+                    <p className="text-[11px] text-muted-foreground">Updated {d.updated}</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-slate-800 font-medium">
-                      {activity.user} <span className="text-slate-500 font-normal">{activity.action}</span>
-                    </p>
-                    <p className="text-sm text-slate-900 font-medium mt-0.5">{activity.item}</p>
-                    {i === 0 && (
-                      <div className="mt-2 bg-slate-50 rounded-lg p-2 border border-slate-100 flex gap-2">
-                        <div className="h-12 w-12 bg-slate-200 rounded border border-slate-300"></div>
-                        <div className="h-12 w-12 bg-slate-200 rounded border border-slate-300"></div>
-                      </div>
-                    )}
-                    {i === 1 && (
-                      <div className="mt-2 bg-blue-50/50 rounded-lg p-3 border border-blue-100 text-xs text-blue-800">
-                        "Great hook, let's publish this!"
-                      </div>
-                    )}
-                    <p className="text-xs text-slate-400 mt-2">{activity.time}</p>
+                  <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11px] font-bold text-emerald-700">{d.score}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </ChartCard>
+
+        <ChartCard
+          title="Upcoming Scheduled"
+          action={<Link href="/calendar" className="text-xs font-semibold text-brand-600 hover:underline">Calendar</Link>}
+          bodyClassName="p-0"
+        >
+          <ul className="divide-y divide-border">
+            {upcomingPosts.map((u) => (
+              <li key={u.id} className="flex items-center gap-3 px-5 py-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                  <CalendarDays className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="line-clamp-1 text-sm font-medium text-foreground">{u.title}</p>
+                  <p className="text-[11px] text-muted-foreground">{u.when}</p>
+                </div>
+                <ContentTypeBadge type={u.type} />
+              </li>
+            ))}
+          </ul>
+        </ChartCard>
+
+        <ChartCard
+          title="Trending Now"
+          action={<Link href="/trends" className="text-xs font-semibold text-brand-600 hover:underline">Trend radar</Link>}
+          bodyClassName="p-0"
+        >
+          <ul className="divide-y divide-border">
+            {trendingNow.map((t) => (
+              <li key={t.id} className="flex items-center gap-3 px-5 py-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-coral-500 text-white">
+                  <Flame className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="line-clamp-1 text-sm font-medium text-foreground">{t.tag}</p>
+                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <PlatformChip platform={t.platform} className="h-4 w-4 border-0 bg-transparent p-0" />
+                    Relevance {t.score}
                   </div>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                <span className="text-xs font-bold text-emerald-600">{t.growth}</span>
+              </li>
+            ))}
+          </ul>
+        </ChartCard>
+      </div>
+
+      {/* Quick actions / AI generations / Activity */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <ChartCard title="Quick Actions" subtitle="Jump back into your workflow">
+          <QuickActions />
+        </ChartCard>
+
+        <ChartCard
+          title="Recent AI Generations"
+          action={<Link href="/content-studio" className="text-xs font-semibold text-brand-600 hover:underline">Studio</Link>}
+          bodyClassName="p-0"
+        >
+          <ul className="divide-y divide-border">
+            {recentGenerations.map((g) => (
+              <li key={g.id} className="flex items-start gap-3 px-5 py-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-600">
+                  <Sparkles className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-foreground">{g.tool}</p>
+                  <p className="line-clamp-1 text-xs text-muted-foreground">{g.preview}</p>
+                  <p className="text-[11px] text-muted-foreground/70">{g.time}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </ChartCard>
+
+        <ChartCard title="Activity Feed">
+          <ActivityFeed items={activityFeed} />
+        </ChartCard>
       </div>
     </div>
   );
