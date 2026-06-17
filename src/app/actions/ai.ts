@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { generateAI } from "@/lib/ai/generate";
 import { buildPrompt, PROMPT_VERSION, toolLabel } from "@/lib/ai/prompts";
 import { createGeneration } from "@/lib/db/ai-generations";
+import { checkAiQuota } from "@/lib/billing/usage";
 import { createIdea as dbCreateIdea } from "@/lib/db/ideas";
 import { createPost as dbCreatePost } from "@/lib/db/posts";
 import type { AIGenerateInput, AIGenerateResult, AIToolId } from "@/lib/ai/types";
@@ -45,6 +46,21 @@ export async function generateContentAction(
       model: null,
       status: "failed",
       error: "Add a topic to generate content.",
+    };
+  }
+
+  // Enforce the monthly AI generation quota (live workspaces only).
+  const quota = await checkAiQuota();
+  if (!quota.allowed) {
+    return {
+      ok: false,
+      output: "",
+      variations: [],
+      demo: false,
+      provider: null,
+      model: null,
+      status: "failed",
+      error: `Monthly AI limit reached (${quota.used}/${quota.limit}). Upgrade your plan for more.`,
     };
   }
 

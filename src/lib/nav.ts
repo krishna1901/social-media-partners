@@ -12,6 +12,7 @@ import {
   Bot,
   Plug,
   Settings,
+  CreditCard,
   type LucideIcon,
 } from "lucide-react";
 
@@ -53,6 +54,7 @@ export const navGroups: NavGroup[] = [
     label: "Configure",
     items: [
       { title: "Integrations", href: "/integrations", icon: Plug },
+      { title: "Plan & Billing", href: "/billing", icon: CreditCard },
       { title: "Settings", href: "/settings", icon: Settings },
     ],
   },

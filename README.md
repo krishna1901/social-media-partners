@@ -58,12 +58,88 @@ switch on auth + live data.
   the data layer with `revalidatePath`.
 - **Storage** (`src/lib/storage.ts`) — validated uploads to the right bucket.
 - **Scheduler** (`src/lib/publishing/*`) — `scheduled_posts` → `publishing_jobs`
-  → `publishing_logs`, with per-platform **placeholder** formatters/publishers.
-  No real publishing happens yet.
+  → `publishing_logs`, with per-platform formatters/publishers.
+- **Publishing job runner** (`src/lib/publishing/runner.ts`) — drains due
+  `publishing_jobs`, claims each atomically, dispatches to the platform
+  publisher, and advances status with retry + backoff and log reconciliation.
+  Triggered by `POST /api/cron/publish` (cron) or the in-app "process now"
+  action. Real per-platform publishing arrives in Phase 3C+; until then the
+  runner records a **simulated** success so the lifecycle is observable.
+
+## Publishing runner (Phase 3B)
+- **Trigger** — `GET|POST /api/cron/publish`. The `vercel.json` cron calls it
+  **daily** (`0 0 * * *`) — Vercel **Hobby** plans only allow once-per-day crons.
+  For a tighter cadence, upgrade to **Pro** (e.g. `*/5 * * * *`) or point an
+  external scheduler (cron-job.org, GitHub Actions, Supabase `pg_cron`) at the
+  endpoint. Set `CRON_SECRET` and the endpoint requires
+  `Authorization: Bearer <secret>` (Vercel Cron sends it automatically). The
+  in-app "process now" action drains the current workspace on demand regardless.
+- **Service role** — the cron runner uses `SUPABASE_SERVICE_ROLE_KEY` (no user
+  session, bypasses RLS) via `src/lib/supabase/admin.ts`. Without it the runner
+  is a safe no-op (`mode: "demo"`).
+- **Simulation** — placeholder publishers report `not_implemented`; with
+  `PUBLISH_SIMULATE` unset/true the runner marks those jobs *posted (simulated)*.
+  Set `PUBLISH_SIMULATE=false` to fail honestly until a real publisher exists.
+- **Retry** — transient failures retry up to 3× with 1m/5m/15m backoff before a
+  terminal failure; parent `scheduled_posts` + `posts` roll up when all jobs end.
 - **AI content generation** (`src/lib/ai/*`) — provider-based, **server-only**
   generation for the 10 Content Studio tools. Dependency-free REST calls to
   OpenAI (`/v1/chat/completions`) and Anthropic (`/v1/messages`). Every run is
   persisted to `ai_generations` (provider, model, status, input/output JSON).
+- **Social OAuth** (`src/lib/integrations/*`, `src/app/api/oauth/*`) — real
+  OAuth 2.0 connect flows. **LinkedIn** (3C): sign-in + publish as the member via
+  the Posts API. **Meta** (3D): Facebook Login → Page tokens + linked Instagram
+  Business account; publish to a Facebook Page feed and to Instagram (media
+  container + publish). Tokens are **encrypted at rest**
+  (`src/lib/security/crypto.ts`, AES-256-GCM) in `social_tokens` and read only
+  server-side by the publishing runner.
+
+## Social connections (Phase 3C–3D)
+- **LinkedIn** — "Connect LinkedIn" → `/api/oauth/linkedin/start` → consent →
+  `/api/oauth/linkedin/callback` stores an encrypted token. Set
+  `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`, `TOKEN_ENCRYPTION_KEY` and
+  register redirect `<NEXT_PUBLIC_APP_URL>/api/oauth/linkedin/callback`.
+- **Meta (Facebook + Instagram)** — "Connect" → `/api/oauth/meta/start` →
+  Facebook Login → `/api/oauth/meta/callback` picks the first managed Page,
+  stores an encrypted Page token (Facebook) and, when a linked IG Business
+  account exists, an Instagram connection too. Set `META_APP_ID`,
+  `META_APP_SECRET`, `TOKEN_ENCRYPTION_KEY` and register redirect
+  `<NEXT_PUBLIC_APP_URL>/api/oauth/meta/callback`. Instagram publishing needs a
+  linked image asset with a public URL.
+- **Publish** — once connected, the job runner posts real LinkedIn / Facebook /
+  Instagram updates; not-yet-implemented platforms (YouTube/TikTok/X) simulate.
+
+## Analytics sync (Phase 3E)
+- **Engine** — `src/lib/analytics/sync.ts` pulls account-level metrics (Facebook
+  Page + Instagram Business followers) into `analytics_snapshots`. Uses stored
+  encrypted tokens; LinkedIn member analytics aren't publicly available so it's
+  Meta-only for now.
+- **Trigger** — `GET|POST /api/cron/analytics` (a second daily `vercel.json`
+  cron, `CRON_SECRET`-gated) for all workspaces, or the **"Sync now"** button on
+  the Analytics page for the active workspace.
+- **Surface** — when synced data exists, the Analytics page shows a live
+  per-platform follower strip; the showcase charts remain demo data.
+
+## More platforms (Phase 3G — YouTube / TikTok / X)
+- **Scaffold** — `src/lib/integrations/scaffold.ts` + generic
+  `/api/oauth/[provider]/{start,callback}` routes connect YouTube (Google),
+  TikTok, and X (OAuth 2.0; X uses PKCE) and store encrypted tokens, reusing the
+  LinkedIn/Meta pattern. LinkedIn/Meta keep dedicated routes (static precedence).
+- **Config** — set the per-provider client id/secret (`GOOGLE_CLIENT_ID/SECRET`,
+  `TIKTOK_CLIENT_KEY/SECRET`, `X_CLIENT_ID/SECRET`) + `TOKEN_ENCRYPTION_KEY`.
+  Configured providers show a real Connect button on Integrations.
+- **Publishing** — real posting for these requires additional platform approval
+  (TikTok content-posting audit, X paid API tier, YouTube resumable upload), so
+  the runner still **simulates** them; the connection plumbing is ready.
+
+## Inbox / comment sync (Phase 3F)
+- **Engine** — `src/lib/inbox/sync.ts` pulls recent comments from Facebook Page
+  posts + Instagram media into `comments_inbox`, deduped by `external_id`
+  (additive column + partial unique index).
+- **Trigger** — the **"Sync"** button on the Inbox page (active workspace) or
+  `GET|POST /api/cron/inbox` for an external scheduler. The inbox cron is **not**
+  in `vercel.json` (Hobby allows only 2 crons — used by publish + analytics);
+  fold it into an external scheduler or upgrade to register it.
 
 ## AI setup (Content Studio)
 The Content Studio works in two modes:
@@ -75,6 +151,18 @@ The Content Studio works in two modes:
   (`openai` | `anthropic`; defaults to whichever key exists, Anthropic preferred)
   and the model with `AI_DEFAULT_MODEL`. Keys are read on the server only and
   never reach the client bundle (`import "server-only"`).
+
+## Plans, usage & billing (Phase 4)
+- **Plans** — `src/lib/billing/plans.ts` defines Starter / Pro / Agency with
+  per-plan limits (connected accounts, AI generations/month, scheduled posts).
+- **Usage + enforcement** — `src/lib/billing/usage.ts` computes live usage; the
+  AI generate action enforces the monthly generation quota and returns a clear
+  upgrade message when exceeded.
+- **Billing page** — `/billing` shows the current plan, usage meters, and a plan
+  comparison. The upgrade CTA links to `NEXT_PUBLIC_UPGRADE_URL` (e.g. a Stripe
+  checkout) or a sales contact when unset. Real checkout is left as an
+  integration point.
+- **Resilience** — root `error.tsx` (recovery boundary) + branded `not-found.tsx`.
 
 ## Scripts
 ```bash
@@ -92,7 +180,8 @@ in demo mode.
 - Real OAuth connect flows + encrypted token storage (`connected_accounts`,
   `social_tokens`, `platform_permissions`).
 - Real publishing per platform (`src/lib/publishing/platforms/*` — currently
-  placeholders) + a cron/queue **job runner** that drains `publishing_jobs`.
+  placeholders; the runner + simulation already exist) — Phase 3C (LinkedIn),
+  3D (Meta), 3G (YouTube/TikTok/X).
 - Analytics sync + comment/DM sync into `analytics_snapshots` / `comments_inbox`.
 - Finish wiring the remaining list pages from demo fallback to live reads
   (the data layer + actions are ready; dashboard counts are already live).

@@ -11,14 +11,12 @@ import { createJob, logJobEvent } from "@/lib/publishing/jobs";
  * a scheduling-intent row, flips the post to 'scheduled', and fans out one
  * 'queued' job per enabled channel.
  *
- * IMPORTANT: nothing here publishes to a real platform. Jobs are created in the
- * 'queued' state and left there.
- *
- * // TODO(phase3): a cron/queue runner (e.g. Supabase Edge Function or a worker)
- * will poll `publishing_jobs` where status='queued' and run_at <= now(), call
- * the matching `@/lib/publishing/platforms/*` `publish()` implementation, and
- * advance status to 'processing' → 'posted'/'failed'. That runner does NOT exist
- * yet; these functions only set up the records it will consume.
+ * Jobs are created in the 'queued' state. The Phase 3B runner
+ * (`@/lib/publishing/runner.ts`, triggered by `/api/cron/publish`) drains them:
+ * it claims due jobs, dispatches to the matching `@/lib/publishing/platforms/*`
+ * publisher, and advances status to 'processing' → 'posted'/'failed' with
+ * retry+backoff. Real per-platform publishing lands in Phase 3C+ (LinkedIn,
+ * Meta, …); until then the runner records a simulated success by default.
  */
 
 export type ScheduleMode = ScheduledPostRow["mode"];
@@ -198,11 +196,9 @@ export async function cancelSchedule(scheduledPostId: string): Promise<Scheduled
 }
 
 /**
- * Retries a job. PLACEHOLDER: resets it to 'queued', bumps `attempts`, clears the
- * error, and logs the retry. Does NOT re-run any publishing.
- *
- * // TODO(phase3): once the runner exists, retry should re-enqueue and let the
- * runner perform the actual platform call.
+ * Retries a job: resets it to 'queued', bumps `attempts`, clears the error, and
+ * logs the retry. The Phase 3B runner picks it up on its next pass and performs
+ * the platform call (or simulated publish).
  */
 export async function retryJob(jobId: string): Promise<PublishingJobRow> {
   const ctx = await requireLiveContext();

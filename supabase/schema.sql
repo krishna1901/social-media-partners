@@ -425,12 +425,17 @@ create table if not exists public.comments_inbox (
   related_post_id uuid references public.posts (id) on delete set null,
   suggested_reply text,
   reply_draft     text,
+  external_id     text,
   received_at     timestamptz default now(),
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now()
 );
-comment on table public.comments_inbox is 'Unified inbox items (manual now; Phase 3 syncs real comment/DM APIs).';
+comment on table public.comments_inbox is 'Unified inbox items (Phase 3F syncs real comment APIs into this).';
+comment on column public.comments_inbox.external_id is 'Provider comment/DM id for idempotent sync (Phase 3F).';
 create index if not exists idx_inbox_workspace on public.comments_inbox (workspace_id);
+create unique index if not exists uq_inbox_external
+  on public.comments_inbox (workspace_id, platform, external_id)
+  where external_id is not null;
 create index if not exists idx_inbox_platform on public.comments_inbox (platform);
 create index if not exists idx_inbox_status on public.comments_inbox (status);
 create index if not exists idx_inbox_created_at on public.comments_inbox (created_at);

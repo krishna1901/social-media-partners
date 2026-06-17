@@ -8,6 +8,7 @@ import {
   markReplied as dbMarkReplied,
   markIgnored as dbMarkIgnored,
 } from "@/lib/db/inbox";
+import { syncCurrentWorkspaceInbox } from "@/lib/inbox/sync";
 import type { InboxRow } from "@/lib/db/types";
 
 type ActionResult<T = Record<string, never>> =
@@ -23,6 +24,19 @@ function errorMessage(err: unknown): string {
 
 function revalidateInbox(): void {
   revalidatePath("/inbox");
+}
+
+/** Sync comments from connected platforms into the inbox. */
+export async function syncInboxAction(): Promise<
+  ActionResult<{ synced: number; platforms: string[]; message?: string }>
+> {
+  try {
+    const summary = await syncCurrentWorkspaceInbox();
+    revalidateInbox();
+    return { ok: true, synced: summary.synced, platforms: summary.platforms, message: summary.message };
+  } catch (err) {
+    return { ok: false, error: errorMessage(err) };
+  }
 }
 
 export async function updateInboxStatus(

@@ -2,8 +2,12 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
-/** Public routes that never require authentication. */
-const PUBLIC_PATHS = ["/login", "/signup", "/auth"];
+/**
+ * Public routes that never require authentication. `/api` is included so route
+ * handlers (e.g. the cron job runner) enforce their own auth instead of being
+ * redirected to `/login`.
+ */
+const PUBLIC_PATHS = ["/login", "/signup", "/auth", "/api"];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));

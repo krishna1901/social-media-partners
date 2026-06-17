@@ -1,29 +1,24 @@
 import "server-only";
 import type { PublishingJobRow } from "@/lib/db/types";
 import type { FormattedPost } from "@/lib/publishing/formatter";
-
-/** Stable result shape returned by every platform `publish` placeholder. */
-export interface PublishResult {
-  ok: boolean;
-  status: "posted" | "failed" | "not_implemented";
-  message: string;
-}
+import type { PublishContext, PublishResult } from "@/lib/publishing/platforms";
 
 export const platform = "youtube" as const;
 
 /**
  * PLACEHOLDER. Does not contact YouTube or publish anything.
  *
- * // TODO(phase3): implement official YouTube API publishing
+ * // TODO(phase3g): implement official YouTube API publishing
  * (Data API v3 resumable video upload + metadata).
  */
 export async function publish(
   _job: PublishingJobRow,
-  _formatted: FormattedPost
+  _formatted: FormattedPost,
+  _ctx: PublishContext
 ): Promise<PublishResult> {
   return {
     ok: false,
     status: "not_implemented",
-    message: "YouTube publishing is a Phase 3 TODO",
+    message: "YouTube publishing is a Phase 3G TODO",
   };
 }

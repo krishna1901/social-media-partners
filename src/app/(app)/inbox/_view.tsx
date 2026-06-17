@@ -15,6 +15,7 @@ import {
   Clock3,
   ArrowUpRight,
   ExternalLink,
+  RefreshCw,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
@@ -27,7 +28,7 @@ import { PlatformIcon } from "@/components/ui/platform-icon";
 import { InboxThread } from "@/components/ui/inbox-thread";
 import { EmptyState } from "@/components/ui/empty-state";
 import { platformMeta } from "@/lib/demo-data";
-import { markReplied, markIgnored, saveReplyDraft } from "@/app/actions/inbox";
+import { markReplied, markIgnored, saveReplyDraft, syncInboxAction } from "@/app/actions/inbox";
 import type { listInbox } from "@/lib/db/inbox";
 
 type InboxViewProps = { threads: Awaited<ReturnType<typeof listInbox>> };
@@ -57,7 +58,17 @@ export function InboxView({ threads }: InboxViewProps) {
   const [platform, setPlatform] = useState("all");
   const [reply, setReply] = useState("");
   const [pending, startTransition] = useTransition();
+  const [isSyncing, startSync] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  function handleSync() {
+    setError(null);
+    startSync(async () => {
+      const res = await syncInboxAction();
+      if (res.ok) router.refresh();
+      else setError(res.error);
+    });
+  }
 
   const filtered = useMemo(() => {
     return threads.filter((t) => {
@@ -146,6 +157,10 @@ export function InboxView({ threads }: InboxViewProps) {
               options={platformOptions}
               className="w-40"
             />
+            <Button variant="outline" onClick={handleSync} disabled={isSyncing}>
+              <RefreshCw className={`h-4 w-4${isSyncing ? " animate-spin" : ""}`} />
+              {isSyncing ? "Syncing…" : "Sync"}
+            </Button>
             <Button variant="outline">
               <Check className="h-4 w-4" /> Mark all read
             </Button>

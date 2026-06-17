@@ -10,8 +10,8 @@ import type { PublishingJobRow } from "@/lib/db/types";
  * active workspace. Reads fall back to empty arrays in demo/preview mode so the
  * UI never breaks; mutations require a live, authenticated context.
  *
- * Nothing here publishes to a real platform — jobs are records the Phase 3
- * runner will consume.
+ * Nothing here publishes to a real platform — jobs are records the Phase 3B
+ * runner (`@/lib/publishing/runner.ts`) consumes.
  */
 
 export type JobStatus = PublishingJobRow["status"];
