@@ -8,12 +8,10 @@ import {
   Building2,
   Palette,
   Sparkles,
-  Webhook,
   Bell,
   Clock,
   Plug,
   Save,
-  Send,
   Plus,
   Settings as SettingsIcon,
   CheckCircle2,
@@ -48,7 +46,6 @@ type SectionId =
   | "workspace"
   | "brand"
   | "ai"
-  | "webhooks"
   | "notifications"
   | "posting"
   | "channels";
@@ -68,7 +65,6 @@ const sections: {
   { id: "ai", label: "AI & content defaults", desc: "Generation defaults", icon: Sparkles, group: "Content" },
   { id: "posting", label: "Posting preferences", desc: "Queue & scheduling", icon: Clock, group: "Content" },
   { id: "notifications", label: "Notifications", desc: "Emails & alerts", icon: Bell, group: "Content" },
-  { id: "webhooks", label: "Webhooks", desc: "External endpoints", icon: Webhook, group: "Connections" },
   { id: "channels", label: "Connected channels", desc: "Social accounts", icon: Plug, group: "Connections" },
 ];
 
@@ -193,10 +189,8 @@ export function SettingsView({ settings, connectedAccounts }: SettingsViewProps)
   const [tagline, setTagline] = useState(settings.tagline);
   const [timezone, setTimezone] = useState(settings.timezone);
   const [defaultTone, setDefaultTone] = useState(settings.defaultTone);
-  const [aiProvider, setAiProvider] = useState(settings.aiProvider);
   const [defaultCTA, setDefaultCTA] = useState(settings.defaultCTA);
   const [defaultHashtags, setDefaultHashtags] = useState(settings.defaultHashtags);
-  const [webhookUrl, setWebhookUrl] = useState(settings.webhookUrl);
 
   const [saving, startSaving] = useTransition();
   const [panelMessage, setPanelMessage] = useState<
@@ -216,10 +210,8 @@ export function SettingsView({ settings, connectedAccounts }: SettingsViewProps)
         tagline,
         timezone,
         defaultTone,
-        aiProvider,
         defaultCTA,
         defaultHashtags,
-        webhookUrl,
       });
       if (!result.ok) {
         setPanelMessage({ tone: "error", text: result.error });
@@ -466,8 +458,13 @@ export function SettingsView({ settings, connectedAccounts }: SettingsViewProps)
                     onChange={(e) => setTimezone(e.target.value)}
                   />
                 </Field>
-                <Field label="Plan">
-                  <SelectField options={["Starter", "Pro", "Agency"]} defaultValue="Pro" />
+                <Field label="Plan" hint="Your plan is managed by your subscription.">
+                  <Link
+                    href="/billing"
+                    className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-muted/40 px-3 text-sm font-medium text-brand-600 hover:bg-muted"
+                  >
+                    Manage in Billing →
+                  </Link>
                 </Field>
               </div>
             </Panel>
@@ -519,13 +516,6 @@ export function SettingsView({ settings, connectedAccounts }: SettingsViewProps)
                     onChange={(e) => setDefaultTone(e.target.value)}
                   />
                 </Field>
-                <Field label="AI provider" hint="AI is managed by the platform — no API key needed.">
-                  <SelectField
-                    options={["OpenAI (GPT)", "Claude"]}
-                    value={aiProvider}
-                    onChange={(e) => setAiProvider(e.target.value)}
-                  />
-                </Field>
               </div>
               <Field label="Default CTA">
                 <Input value={defaultCTA} onChange={(e) => setDefaultCTA(e.target.value)} />
@@ -537,39 +527,6 @@ export function SettingsView({ settings, connectedAccounts }: SettingsViewProps)
                   rows={3}
                 />
               </Field>
-            </Panel>
-          )}
-
-          {active === "webhooks" && (
-            <Panel
-              title="Webhooks"
-              description="Send workspace events to an external endpoint."
-              icon={Webhook}
-              onSave={saveSettings}
-              saving={saving}
-              message={panelMessage}
-            >
-              <Field
-                label="Webhook URL"
-                hint="Placeholder — events POST as JSON. Signing secrets arrive in a later phase."
-              >
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <Input
-                    value={webhookUrl}
-                    onChange={(e) => setWebhookUrl(e.target.value)}
-                    className="font-mono"
-                  />
-                  <Button variant="outline" size="sm" className="shrink-0">
-                    <Send className="h-3.5 w-3.5" /> Test webhook
-                  </Button>
-                </div>
-              </Field>
-              <div className="rounded-xl border border-dashed border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
-                Delivers events such as{" "}
-                <span className="font-medium text-foreground">post.published</span>,{" "}
-                <span className="font-medium text-foreground">comment.received</span> and{" "}
-                <span className="font-medium text-foreground">automation.run</span>.
-              </div>
             </Panel>
           )}
 

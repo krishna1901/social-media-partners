@@ -75,6 +75,14 @@ export const SECRET_GROUPS: SecretGroup[] = [
     ],
   },
   {
+    group: "Platform webhook",
+    description: "Outbound webhook for platform events (e.g. post.published). Optional HMAC signing.",
+    items: [
+      { key: "PLATFORM_WEBHOOK_URL", label: "Webhook URL", isSecret: false },
+      { key: "PLATFORM_WEBHOOK_SIGNING_SECRET", label: "Webhook signing secret" },
+    ],
+  },
+  {
     group: "Cron",
     description: "Protects the /api/cron/* endpoints.",
     items: [{ key: "CRON_SECRET", label: "Cron secret" }],

@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireLiveContext } from "@/lib/db/context";
 import { formatForPlatform } from "@/lib/publishing/formatter";
 import { publishToPlatform } from "@/lib/publishing/platforms";
+import { dispatchWebhook } from "@/lib/platform/webhook";
 
 /**
  * Phase 3B — publishing job runner.
@@ -133,6 +134,13 @@ async function reconcileParents(client: SupabaseClient, job: PublishingJobRow): 
       .update({ status: finalStatus })
       .eq("id", job.post_id)
       .eq("workspace_id", job.workspace_id);
+    if (finalStatus === "posted") {
+      // Best-effort outbound platform webhook (admin-configured URL).
+      await dispatchWebhook("post.published", {
+        postId: job.post_id,
+        workspaceId: job.workspace_id,
+      });
+    }
   }
 }
 
