@@ -12,6 +12,7 @@ import {
   type PostInput,
   type DbPostStatus,
 } from "@/lib/db/posts";
+import { linkMediaAssetsToPost } from "@/lib/db/media";
 import { schedulePost } from "@/lib/publishing/scheduler";
 import type { ScheduleMode } from "@/lib/publishing/scheduler";
 import type { Platform } from "@/lib/demo-data";
@@ -35,10 +36,15 @@ function revalidatePosts(): void {
 }
 
 export async function createPost(
-  input: PostInput
+  input: PostInput,
+  mediaIds?: string[]
 ): Promise<ActionResult<{ id: string }>> {
   try {
     const post = await dbCreatePost(input);
+    if (mediaIds?.length) {
+      await linkMediaAssetsToPost(mediaIds, post.id);
+      revalidatePath("/media");
+    }
     revalidatePosts();
     return { ok: true, id: post.id };
   } catch (err) {
@@ -48,10 +54,15 @@ export async function createPost(
 
 export async function updatePost(
   id: string,
-  input: PostInput
+  input: PostInput,
+  mediaIds?: string[]
 ): Promise<ActionResult<{ id: string }>> {
   try {
     const post = await dbUpdatePost(id, input);
+    if (mediaIds?.length) {
+      await linkMediaAssetsToPost(mediaIds, post.id);
+      revalidatePath("/media");
+    }
     revalidatePosts();
     return { ok: true, id: post.id };
   } catch (err) {

@@ -179,6 +179,18 @@ export async function linkMediaToPost(
   return data as MediaAssetRow;
 }
 
+/** Link several media assets to a post in one update (workspace-scoped). */
+export async function linkMediaAssetsToPost(mediaIds: string[], postId: string): Promise<void> {
+  if (mediaIds.length === 0) return;
+  const ctx = await requireLiveContext();
+  const { error } = await ctx.supabase
+    .from("media_assets")
+    .update({ linked_post_id: postId })
+    .eq("workspace_id", ctx.workspaceId)
+    .in("id", mediaIds);
+  if (error) throw error;
+}
+
 /** Archive a media asset (archived=true). Returns the updated row. */
 export async function archiveMedia(id: string): Promise<MediaAssetRow> {
   const ctx = await requireLiveContext();
@@ -193,14 +205,29 @@ export async function archiveMedia(id: string): Promise<MediaAssetRow> {
   return data as MediaAssetRow;
 }
 
-/** Permanently delete a media asset. Returns the deleted id. */
+/** Permanently delete a media asset + its underlying storage object. */
 export async function deleteMedia(id: string): Promise<string> {
   const ctx = await requireLiveContext();
+
+  // Capture the storage location before deleting the row.
+  const { data: asset } = await ctx.supabase
+    .from("media_assets")
+    .select("bucket, path")
+    .eq("workspace_id", ctx.workspaceId)
+    .eq("id", id)
+    .maybeSingle();
+
   const { error } = await ctx.supabase
     .from("media_assets")
     .delete()
     .eq("workspace_id", ctx.workspaceId)
     .eq("id", id);
   if (error) throw error;
+
+  const loc = asset as { bucket: string | null; path: string | null } | null;
+  if (loc?.bucket && loc.path) {
+    // Best-effort: remove the file from Storage (ignore failures).
+    await ctx.supabase.storage.from(loc.bucket).remove([loc.path]);
+  }
   return id;
 }
