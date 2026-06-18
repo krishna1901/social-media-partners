@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronsUpDown, Check, Sparkles, LogOut, Settings as SettingsIcon, User } from "lucide-react";
+import { ChevronsUpDown, Check, Sparkles, LogOut, Settings as SettingsIcon, User, ShieldCheck } from "lucide-react";
 import { navGroups } from "@/lib/nav";
 import { workspaces as demoWorkspaces, currentUser } from "@/lib/demo-data";
 import { Avatar } from "@/components/ui/avatar";
@@ -185,6 +185,19 @@ export function Sidebar({
           </div>
         ))}
       </nav>
+
+      {/* Master admin (super-admins only) */}
+      {session.isSuperAdmin && (
+        <div className="px-3 pb-2">
+          <Link
+            href="/admin"
+            onClick={onNavigate}
+            className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-brand-300 ring-1 ring-inset ring-brand-500/30 transition-colors hover:bg-white/5 hover:text-brand-200"
+          >
+            <ShieldCheck className="h-[18px] w-[18px]" /> Admin Panel
+          </Link>
+        </div>
+      )}
 
       {/* Upgrade card */}
       <div className="px-3 pb-3">
