@@ -5,6 +5,7 @@ import {
   CreditCard,
   KeyRound,
   ScrollText,
+  Activity,
   type LucideIcon,
 } from "lucide-react";
 
@@ -20,5 +21,6 @@ export const adminNav: AdminNavItem[] = [
   { title: "Workspaces", href: "/admin/workspaces", icon: Building2 },
   { title: "Billing", href: "/admin/billing", icon: CreditCard },
   { title: "Platform Keys", href: "/admin/secrets", icon: KeyRound },
+  { title: "Health", href: "/admin/health", icon: Activity },
   { title: "Audit Log", href: "/admin/audit", icon: ScrollText },
 ];
