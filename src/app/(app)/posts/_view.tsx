@@ -517,6 +517,11 @@ export function PostsView({ posts, counts }: PostsViewProps) {
               <ContentTypeBadge type={preview.type} />
             </div>
 
+            {preview.image && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={preview.image} alt="" className="aspect-video w-full rounded-2xl object-cover ring-1 ring-border/50" />
+            )}
+
             {/* Meta section */}
             <section className="space-y-3">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Overview</p>

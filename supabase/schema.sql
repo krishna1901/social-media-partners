@@ -670,20 +670,30 @@ drop policy if exists "storage_public_read" on storage.objects;
 create policy "storage_public_read" on storage.objects
   for select using (bucket_id in ('media','thumbnails','carousels','videos'));
 
+-- Authenticated users may only write to their OWN folder (`${auth.uid()}/...`).
 drop policy if exists "storage_auth_insert" on storage.objects;
 create policy "storage_auth_insert" on storage.objects
   for insert to authenticated
-  with check (bucket_id in ('media','thumbnails','carousels','videos','zips'));
+  with check (
+    bucket_id in ('media','thumbnails','carousels','videos','zips')
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
 
 drop policy if exists "storage_auth_update" on storage.objects;
 create policy "storage_auth_update" on storage.objects
   for update to authenticated
-  using (bucket_id in ('media','thumbnails','carousels','videos','zips'));
+  using (
+    bucket_id in ('media','thumbnails','carousels','videos','zips')
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
 
 drop policy if exists "storage_auth_delete" on storage.objects;
 create policy "storage_auth_delete" on storage.objects
   for delete to authenticated
-  using (bucket_id in ('media','thumbnails','carousels','videos','zips'));
+  using (
+    bucket_id in ('media','thumbnails','carousels','videos','zips')
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
 
 -- Private bucket (zips) read restricted to authenticated users.
 drop policy if exists "storage_zips_read_auth" on storage.objects;

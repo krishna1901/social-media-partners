@@ -4,7 +4,10 @@ import type { PostRow, Platform, PostType, PostStatus } from "@/lib/db/types";
 import { posts as demoPosts, dashboardStats } from "@/lib/demo-data";
 
 /** Demo-facing shape consumed by the posts UI (matches `@/lib/demo-data` `posts`). */
-export type MappedPost = (typeof demoPosts)[number];
+export type MappedPost = (typeof demoPosts)[number] & {
+  /** First attached image URL (live posts), when present. */
+  image?: string;
+};
 
 /** DB post status — superset of the demo `PostStatus` (DB also allows 'archived'). */
 export type DbPostStatus = PostStatus | "archived";
@@ -35,6 +38,7 @@ export interface PostInput {
 /** A post row joined with its post_channels (as Supabase returns nested rows). */
 interface PostRowWithChannels extends Omit<PostRow, "platforms"> {
   post_channels: { platform: Platform; enabled: boolean }[] | null;
+  media_assets: { url: string | null; kind: string; archived: boolean }[] | null;
 }
 
 /** "Mmm d, yyyy" (e.g. "Jun 18, 2026") from an ISO timestamp. */
@@ -55,6 +59,9 @@ function platformsFromChannels(
 
 /** Map a joined DB row to the demo-facing list shape. */
 function toMappedPost(row: PostRowWithChannels): MappedPost {
+  const image = (row.media_assets ?? [])
+    .filter((m) => !m.archived && m.kind === "image" && m.url)
+    .map((m) => m.url as string)[0];
   return {
     id: row.id,
     title: row.title,
@@ -64,6 +71,7 @@ function toMappedPost(row: PostRowWithChannels): MappedPost {
     status: row.status,
     date: formatDate(row.scheduled_at ?? row.created_at),
     author: "You",
+    image,
   };
 }
 
@@ -74,7 +82,7 @@ export async function listPosts(): Promise<MappedPost[]> {
 
   const { data, error } = await ctx.supabase
     .from("posts")
-    .select("*, post_channels(platform,enabled)")
+    .select("*, post_channels(platform,enabled), media_assets(url,kind,archived)")
     .eq("workspace_id", ctx.workspaceId)
     .neq("status", "archived")
     .order("created_at", { ascending: false });

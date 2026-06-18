@@ -17,6 +17,7 @@ export interface PostCardData {
   author: string;
   reach?: string;
   engagement?: string;
+  image?: string;
 }
 
 export function PostCard({
@@ -41,6 +42,10 @@ export function PostCard({
         <PlatformStack platforms={post.platforms} />
         <StatusBadge status={post.status} />
       </div>
+      {post.image && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={post.image} alt="" className="aspect-video w-full rounded-xl object-cover ring-1 ring-border/50" />
+      )}
       <div>
         <h3 className="line-clamp-1 text-sm font-semibold text-foreground group-hover:text-brand-600">{post.title}</h3>
         <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{post.excerpt}</p>

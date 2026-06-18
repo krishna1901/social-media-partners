@@ -41,6 +41,8 @@ import { PlatformIcon } from "@/components/ui/platform-icon";
 import { platformMeta, type Platform } from "@/lib/demo-data";
 import { cn } from "@/lib/utils";
 import { createPost, setPostChannels, schedulePostAction } from "@/app/actions/posts";
+import { createMediaAsset as createMediaAssetAction } from "@/app/actions/media";
+import { uploadMedia, type MediaKind } from "@/lib/storage";
 import type { ScheduleMode } from "@/lib/publishing/scheduler";
 import type { PostType } from "@/lib/db/types";
 
@@ -66,11 +68,25 @@ const AI_ACTIONS = [
   { label: "Improve CTA", hint: "Drive the next action", icon: Megaphone },
 ];
 
-const MEDIA_THUMBS = [
-  { id: "att1", gradient: "from-orange-400 to-rose-500", label: "cover.png" },
-  { id: "att2", gradient: "from-violet-500 to-indigo-600", label: "reel.mp4" },
-  { id: "att3", gradient: "from-sky-500 to-cyan-500", label: "carousel.zip" },
-];
+type Attachment = { id: string; url: string; name: string; kind: MediaKind };
+
+function kindForFile(file: File): MediaKind {
+  if (file.type.startsWith("video/")) return "video";
+  if (file.type === "application/zip" || file.type === "application/x-zip-compressed") return "zip";
+  return "image";
+}
+
+async function imageSize(file: File): Promise<{ width: number; height: number } | null> {
+  if (!file.type.startsWith("image/")) return null;
+  try {
+    const bmp = await createImageBitmap(file);
+    const size = { width: bmp.width, height: bmp.height };
+    bmp.close();
+    return size;
+  } catch {
+    return null;
+  }
+}
 
 export default function NewPostPage() {
   const router = useRouter();
@@ -98,7 +114,8 @@ export default function NewPostPage() {
   const [notes, setNotes] = useState("");
   const [schedDate, setSchedDate] = useState("2026-06-18");
   const [schedTime, setSchedTime] = useState("09:00");
-  const [attachments, setAttachments] = useState(MEDIA_THUMBS);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // The composer's current fields, mapped to the data layer's PostInput shape.
   const composerInput = () => ({
@@ -117,7 +134,10 @@ export default function NewPostPage() {
   const persistPost = async (
     status: "draft" | "scheduled"
   ): Promise<string | null> => {
-    const created = await createPost({ ...composerInput(), status });
+    const created = await createPost(
+      { ...composerInput(), status },
+      attachments.map((a) => a.id)
+    );
     if (!created.ok) {
       setSaveError(created.error);
       return null;
@@ -166,6 +186,39 @@ export default function NewPostPage() {
     });
   };
 
+  const handleUpload = (files: FileList) => {
+    setUploadError(null);
+    const list = Array.from(files);
+    startTransition(async () => {
+      for (const file of list) {
+        try {
+          const kind = kindForFile(file);
+          const result = await uploadMedia(file, { kind });
+          const dims = await imageSize(file);
+          const res = await createMediaAssetAction({
+            name: file.name,
+            kind,
+            bucket: result.bucket,
+            path: result.path,
+            url: result.url,
+            size_bytes: result.size,
+            mime_type: result.mimeType,
+            width: dims?.width ?? null,
+            height: dims?.height ?? null,
+            dimensions: dims ? `${dims.width}×${dims.height}` : null,
+          });
+          if (!res.ok) {
+            setUploadError(res.error);
+            continue;
+          }
+          setAttachments((prev) => [...prev, { id: res.id, url: result.url, name: file.name, kind }]);
+        } catch (err) {
+          setUploadError(err instanceof Error ? err.message : "Upload failed.");
+        }
+      }
+    });
+  };
+
   const removeAttachment = (id: string) =>
     setAttachments((prev) => prev.filter((a) => a.id !== id));
 
@@ -176,6 +229,7 @@ export default function NewPostPage() {
     (previewPlatform === "linkedin" && liCaption) ||
     universalCaption ||
     "Your caption preview will appear here. Start typing to see it come to life across your selected channels.";
+  const firstImage = attachments.find((a) => a.kind === "image")?.url;
 
   return (
     <div className="space-y-6">
@@ -385,26 +439,33 @@ export default function NewPostPage() {
             }
           >
             <div className="space-y-4">
-              <UploadDropzone hint="Drop media for this post — images, video, ZIPs up to 200MB" />
+              <UploadDropzone onFiles={handleUpload} hint="Drop media for this post — images, video, ZIPs up to 200MB" />
+              {uploadError && <p className="text-xs font-medium text-destructive">{uploadError}</p>}
               {attachments.length > 0 && (
                 <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
                   {attachments.map((a) => (
                     <div key={a.id} className="group/thumb relative">
-                      <div
-                        className={cn(
-                          "aspect-square w-full rounded-xl bg-gradient-to-br shadow-sm ring-1 ring-border/50 transition-transform duration-200 group-hover/thumb:-translate-y-0.5",
-                          a.gradient
-                        )}
-                      />
+                      {a.kind === "image" ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={a.url}
+                          alt={a.name}
+                          className="aspect-square w-full rounded-xl object-cover shadow-sm ring-1 ring-border/50 transition-transform duration-200 group-hover/thumb:-translate-y-0.5"
+                        />
+                      ) : (
+                        <div className="flex aspect-square w-full items-center justify-center rounded-xl bg-muted text-muted-foreground shadow-sm ring-1 ring-border/50">
+                          {a.kind === "video" ? <Video className="h-5 w-5" /> : <GalleryHorizontalEnd className="h-5 w-5" />}
+                        </div>
+                      )}
                       <button
                         type="button"
                         onClick={() => removeAttachment(a.id)}
-                        aria-label={`Remove ${a.label}`}
+                        aria-label={`Remove ${a.name}`}
                         className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm transition-colors hover:bg-destructive/10 hover:text-destructive"
                       >
                         <X className="h-3 w-3" />
                       </button>
-                      <p className="mt-1 truncate text-[10px] text-muted-foreground">{a.label}</p>
+                      <p className="mt-1 truncate text-[10px] text-muted-foreground">{a.name}</p>
                     </div>
                   ))}
                 </div>
@@ -434,7 +495,12 @@ export default function NewPostPage() {
               <p className="mb-3 line-clamp-4 whitespace-pre-wrap text-xs leading-relaxed text-foreground">
                 {previewCaption}
               </p>
-              <div className="aspect-[4/5] w-full rounded-2xl bg-gradient-to-br from-brand-500 via-coral-400 to-amber-400 shadow-sm" />
+              {firstImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={firstImage} alt="" className="aspect-[4/5] w-full rounded-2xl object-cover shadow-sm" />
+              ) : (
+                <div className="aspect-[4/5] w-full rounded-2xl bg-gradient-to-br from-brand-500 via-coral-400 to-amber-400 shadow-sm" />
+              )}
               <div className="mt-3 flex items-center gap-4 text-muted-foreground">
                 <span className="inline-flex items-center gap-1 text-[11px] font-medium tabular-nums">
                   <Heart className="h-4 w-4" /> 1.2K
