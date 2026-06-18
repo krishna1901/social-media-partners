@@ -41,5 +41,5 @@ export default async function AnalyticsPage() {
       </div>
     ) : null;
 
-  return <AnalyticsView syncControl={<AnalyticsSyncButton />} liveStrip={liveStrip} />;
+  return <AnalyticsView syncControl={<AnalyticsSyncButton />} liveStrip={liveStrip} demo={!summary.live} />;
 }

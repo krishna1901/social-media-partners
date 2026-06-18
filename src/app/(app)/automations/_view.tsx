@@ -40,6 +40,7 @@ type AutomationsViewProps = {
   automations: Awaited<ReturnType<typeof listAutomations>>;
   pendingApprovals: number;
   leadsCaptured: number;
+  demo: boolean;
 };
 
 type AutomationType = "dm-keyword" | "comment-reply" | "lead-capture";
@@ -144,7 +145,10 @@ export function AutomationsView({
   automations,
   pendingApprovals,
   leadsCaptured,
+  demo,
 }: AutomationsViewProps) {
+  // Live accounts have no demo log feed yet → empty; demo shows the showcase.
+  const logs = demo ? automationLogs : [];
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -460,15 +464,15 @@ export function AutomationsView({
           }
           footer={
             <span>
-              {automationLogs.length} recent events ·{" "}
-              {automationLogs.filter((l) => l.status === "success").length} succeeded ·{" "}
-              {automationLogs.filter((l) => l.status === "pending").length} awaiting approval
+              {logs.length} recent events ·{" "}
+              {logs.filter((l) => l.status === "success").length} succeeded ·{" "}
+              {logs.filter((l) => l.status === "pending").length} awaiting approval
             </span>
           }
         >
           <DataTable
             columns={logColumns}
-            data={automationLogs}
+            data={logs}
             getRowKey={(row) => row.id}
             empty="No automation activity yet."
           />

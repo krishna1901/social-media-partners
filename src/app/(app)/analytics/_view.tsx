@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { SelectField } from "@/components/ui/select-field";
 import { Progress } from "@/components/ui/progress";
 import { PlatformBadge, PlatformChip } from "@/components/ui/platform-badge";
+import { EmptyState } from "@/components/ui/empty-state";
 import { AreaChart } from "@/components/charts/area-chart";
 import { BarChart } from "@/components/charts/bar-chart";
 import { DonutChart } from "@/components/charts/donut-chart";
@@ -60,9 +61,11 @@ const maxHoursPerDay = Math.max(...bestPostingTimes.map((d) => d.hours.length));
 export function AnalyticsView({
   syncControl,
   liveStrip,
+  demo,
 }: {
   syncControl?: ReactNode;
   liveStrip?: ReactNode;
+  demo: boolean;
 }) {
   return (
     <div className="space-y-6">
@@ -102,6 +105,8 @@ export function AnalyticsView({
 
       {liveStrip}
 
+      {demo ? (
+        <>
       {/* Headline metrics */}
       <div className="grid animate-pop grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
         {analyticsMetrics.map((m) => (
@@ -357,6 +362,14 @@ export function AnalyticsView({
           />
         </div>
       </div>
+        </>
+      ) : (
+        <EmptyState
+          icon={<BarChart3 className="h-6 w-6" />}
+          title="No analytics yet"
+          description="Connect your accounts and start publishing — reach, engagement and top posts appear here once your data syncs."
+        />
+      )}
     </div>
   );
 }
