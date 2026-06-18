@@ -76,7 +76,9 @@ export async function runWorkspaceAutomations(
     .from("dm_automations")
     .select("*")
     .eq("workspace_id", workspaceId)
-    .eq("active", true);
+    .eq("active", true)
+    // Legacy inbox rules only — general (trigger_type) rules run via the engine.
+    .is("trigger_type", null);
   const automations = (autoData as AutomationRow[] | null) ?? [];
   if (automations.length === 0) {
     return { automations: 0, matched: 0, drafted: 0, autoHandled: 0 };
@@ -194,7 +196,8 @@ export async function runAllWorkspacesAutomations(): Promise<AutomationRunSummar
   const { data } = await admin
     .from("dm_automations")
     .select("workspace_id")
-    .eq("active", true);
+    .eq("active", true)
+    .is("trigger_type", null);
   const workspaces = [
     ...new Set(((data as { workspace_id: string }[] | null) ?? []).map((r) => r.workspace_id)),
   ];

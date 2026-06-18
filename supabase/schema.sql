@@ -790,5 +790,73 @@ create table if not exists public.platform_secrets (
 alter table public.platform_secrets enable row level security;
 
 -- ============================================================================
+-- Phase 6 — Automation engine MVP.
+-- Generalizes dm_automations into a safe, approval-based rule engine and adds an
+-- append-only run log. Additive + idempotent (safe to re-run). Legacy DM/inbox
+-- rows keep trigger_type/action_type NULL and continue running via the legacy
+-- inbox runner; the general engine only acts on rows where trigger_type is set.
+-- ============================================================================
+
+alter table public.dm_automations add column if not exists trigger_type  text;
+alter table public.dm_automations add column if not exists conditions    jsonb not null default '{}'::jsonb;
+alter table public.dm_automations add column if not exists action_type   text;
+alter table public.dm_automations add column if not exists action_config jsonb not null default '{}'::jsonb;
+
+comment on column public.dm_automations.trigger_type is
+  'General automation trigger (Phase 6). NULL = legacy DM/inbox rule (keys off "type").';
+comment on column public.dm_automations.conditions is
+  'Trigger match conditions (keyword, limit, frequency, filters…).';
+comment on column public.dm_automations.action_type is
+  'Safe internal action the rule performs (Phase 6).';
+comment on column public.dm_automations.action_config is
+  'Action configuration (reply/post templates, notify channel…).';
+
+-- trigger_type / action_type allow NULL (legacy rows) or one of the known values.
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'dm_automations_trigger_type_check') then
+    alter table public.dm_automations add constraint dm_automations_trigger_type_check
+      check (trigger_type is null or trigger_type in (
+        'inbox-keyword','content-pool-queue','recurring-post',
+        'media-to-draft','failed-publish-alert','idea-ready-to-draft',
+        'competitor-post-to-idea'
+      ));
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'dm_automations_action_type_check') then
+    alter table public.dm_automations add constraint dm_automations_action_type_check
+      check (action_type is null or action_type in (
+        'create-draft-post','queue-scheduled-post','inbox-suggested-reply',
+        'create-content-idea','write-log','notify'
+      ));
+  end if;
+end $$;
+
+create index if not exists idx_automations_trigger_type on public.dm_automations (trigger_type);
+
+-- Append-only automation run log (no updated_at → no set_updated_at trigger).
+create table if not exists public.automation_logs (
+  id            uuid primary key default gen_random_uuid(),
+  workspace_id  uuid not null references public.workspaces (id) on delete cascade,
+  rule_id       uuid references public.dm_automations (id) on delete set null,
+  run_id        uuid not null default gen_random_uuid(),
+  status        text not null default 'success'
+                check (status in ('success','skipped','pending','failed','dry_run')),
+  action_taken  text,
+  error_message text,
+  created_at    timestamptz not null default now()
+);
+comment on table public.automation_logs is 'Append-only automation engine run log (Phase 6); one row per rule per run.';
+create index if not exists idx_automation_logs_workspace on public.automation_logs (workspace_id);
+create index if not exists idx_automation_logs_rule on public.automation_logs (rule_id);
+create index if not exists idx_automation_logs_run on public.automation_logs (run_id);
+create index if not exists idx_automation_logs_created_at on public.automation_logs (created_at desc);
+
+alter table public.automation_logs enable row level security;
+drop policy if exists "automation_logs_member_all" on public.automation_logs;
+create policy "automation_logs_member_all" on public.automation_logs
+  for all
+  using (public.is_workspace_member(workspace_id))
+  with check (public.is_workspace_member(workspace_id));
+
+-- ============================================================================
 -- End of schema.
 -- ============================================================================

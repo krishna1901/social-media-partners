@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { syncAllWorkspacesInbox } from "@/lib/inbox/sync";
 import { runAllWorkspacesAutomations } from "@/lib/automations/runner";
+import { runAllWorkspacesEngine } from "@/lib/automations/engine";
 import { getPlatformSecret } from "@/lib/platform/secrets";
 
 /**
@@ -29,7 +30,13 @@ async function handle(request: NextRequest) {
     // Sync first so automations can act on freshly-pulled comments.
     const sync = await syncAllWorkspacesInbox();
     const automations = await runAllWorkspacesAutomations();
-    return NextResponse.json({ ok: sync.ok && automations.ok, sync, automations });
+    const engine = await runAllWorkspacesEngine();
+    return NextResponse.json({
+      ok: sync.ok && automations.ok && engine.ok,
+      sync,
+      automations,
+      engine,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Sync failed.";
     return NextResponse.json({ ok: false, error: message }, { status: 500 });

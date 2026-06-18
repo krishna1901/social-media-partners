@@ -1,9 +1,39 @@
 import "server-only";
 import { getDbContext, isLive, requireLiveContext } from "@/lib/db/context";
-import type { AutomationRow } from "@/lib/db/types";
-import { automations as demoAutomations } from "@/lib/demo-data";
+import type {
+  AutomationRow,
+  AutomationLogRow,
+  AutomationTriggerType,
+  AutomationActionType,
+} from "@/lib/db/types";
+import { automations as demoAutomations, automationLogs as demoLogs } from "@/lib/demo-data";
 
-export type MappedAutomation = (typeof demoAutomations)[number];
+/** Demo-facing automation shape consumed by the Automations UI. */
+export interface AutomationListItem {
+  id: string;
+  name: string;
+  /** Legacy DM type (back-compat); general rules use `triggerType`. */
+  type: AutomationRow["type"];
+  triggerType: AutomationTriggerType | null;
+  actionType: AutomationActionType | null;
+  description: string;
+  trigger: string;
+  conditions: Record<string, unknown>;
+  actionConfig: Record<string, unknown>;
+  active: boolean;
+  requiresApproval: boolean;
+  runs: number;
+  lastRun: string;
+}
+
+/** A flattened automation log row for the logs table. */
+export interface AutomationLogItem {
+  id: string;
+  rule: string;
+  event: string;
+  status: AutomationLogRow["status"];
+  time: string;
+}
 
 /** Compact relative time (e.g. "26m ago", "4h ago", "2d ago"). */
 function relativeTime(iso: string | null): string {
@@ -24,13 +54,23 @@ function relativeTime(iso: string | null): string {
   return `${wk}w ago`;
 }
 
-function mapAutomation(row: AutomationRow): MappedAutomation {
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function mapAutomation(row: AutomationRow): AutomationListItem {
   return {
     id: row.id,
     name: row.name,
     type: row.type,
+    triggerType: row.trigger_type ?? null,
+    actionType: row.action_type ?? null,
     description: row.description ?? "",
     trigger: row.trigger ?? "",
+    conditions: asRecord(row.conditions),
+    actionConfig: asRecord(row.action_config),
     active: row.active,
     requiresApproval: row.requires_approval,
     runs: row.runs,
@@ -38,10 +78,29 @@ function mapAutomation(row: AutomationRow): MappedAutomation {
   };
 }
 
-/** Automation definitions shaped like demo `automations`. Demo fallback. */
-export async function listAutomations(): Promise<MappedAutomation[]> {
+/** Map the demo automations into the general list shape (legacy DM rules). */
+function demoListItems(): AutomationListItem[] {
+  return demoAutomations.map((a) => ({
+    id: a.id,
+    name: a.name,
+    type: a.type,
+    triggerType: null,
+    actionType: null,
+    description: a.description,
+    trigger: a.trigger,
+    conditions: {},
+    actionConfig: {},
+    active: a.active,
+    requiresApproval: a.requiresApproval,
+    runs: a.runs,
+    lastRun: a.lastRun,
+  }));
+}
+
+/** Automation definitions for the active workspace. Demo fallback. */
+export async function listAutomations(): Promise<AutomationListItem[]> {
   const ctx = await getDbContext();
-  if (!isLive(ctx)) return demoAutomations;
+  if (!isLive(ctx)) return demoListItems();
 
   const { data, error } = await ctx.supabase
     .from("dm_automations")
@@ -53,9 +112,42 @@ export async function listAutomations(): Promise<MappedAutomation[]> {
   return (data as AutomationRow[]).map(mapAutomation);
 }
 
+/** Recent automation run log for the active workspace. Demo fallback. */
+export async function listAutomationLogs(limit = 50): Promise<AutomationLogItem[]> {
+  const ctx = await getDbContext();
+  if (!isLive(ctx)) {
+    return demoLogs.map((l) => ({
+      id: l.id,
+      rule: l.automation,
+      event: l.event,
+      status: l.status,
+      time: l.time,
+    }));
+  }
+
+  const { data, error } = await ctx.supabase
+    .from("automation_logs")
+    .select("*, dm_automations:rule_id(name)")
+    .eq("workspace_id", ctx.workspaceId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error || !data) return [];
+  type LogWithRule = AutomationLogRow & { dm_automations: { name: string } | null };
+  return (data as LogWithRule[]).map((row) => ({
+    id: row.id,
+    rule: row.dm_automations?.name ?? "Automation",
+    event: row.action_taken ?? row.error_message ?? "—",
+    status: row.status,
+    time: relativeTime(row.created_at),
+  }));
+}
+
 export interface AutomationStats {
   /** Inbox items awaiting review (comments_inbox status='new'). */
   pendingApprovals: number;
+  /** Pending automation actions awaiting approval. */
+  pendingActions: number;
   /** Total runs across lead-capture automations. */
   leadsCaptured: number;
 }
@@ -66,14 +158,19 @@ export interface AutomationStats {
  */
 export async function getAutomationStats(): Promise<AutomationStats> {
   const ctx = await getDbContext();
-  if (!isLive(ctx)) return { pendingApprovals: 3, leadsCaptured: 248 };
+  if (!isLive(ctx)) return { pendingApprovals: 3, pendingActions: 2, leadsCaptured: 248 };
 
-  const [inboxRes, leadRes] = await Promise.all([
+  const [inboxRes, pendingRes, leadRes] = await Promise.all([
     ctx.supabase
       .from("comments_inbox")
       .select("*", { count: "exact", head: true })
       .eq("workspace_id", ctx.workspaceId)
       .eq("status", "new"),
+    ctx.supabase
+      .from("automation_logs")
+      .select("*", { count: "exact", head: true })
+      .eq("workspace_id", ctx.workspaceId)
+      .eq("status", "pending"),
     ctx.supabase
       .from("dm_automations")
       .select("runs")
@@ -82,18 +179,23 @@ export async function getAutomationStats(): Promise<AutomationStats> {
   ]);
 
   const pendingApprovals = inboxRes.count ?? 0;
+  const pendingActions = pendingRes.count ?? 0;
   const leadsCaptured = ((leadRes.data as { runs: number }[] | null) ?? []).reduce(
     (sum, r) => sum + (r.runs ?? 0),
     0
   );
-  return { pendingApprovals, leadsCaptured };
+  return { pendingApprovals, pendingActions, leadsCaptured };
 }
 
 export interface CreateAutomationInput {
   name: string;
   type?: AutomationRow["type"];
+  triggerType?: AutomationTriggerType | null;
+  actionType?: AutomationActionType | null;
   description?: string | null;
   trigger?: string | null;
+  conditions?: Record<string, unknown>;
+  actionConfig?: Record<string, unknown>;
   active?: boolean;
   requiresApproval?: boolean;
 }
@@ -109,8 +211,12 @@ export async function createAutomation(
       created_by: ctx.userId,
       name: input.name,
       type: input.type ?? "dm-keyword",
+      trigger_type: input.triggerType ?? null,
+      action_type: input.actionType ?? null,
       description: input.description ?? null,
       trigger: input.trigger ?? null,
+      conditions: input.conditions ?? {},
+      action_config: input.actionConfig ?? {},
       active: input.active ?? false,
       requires_approval: input.requiresApproval ?? true,
     })
@@ -128,8 +234,12 @@ export async function updateAutomation(
   const patch: Record<string, unknown> = {};
   if (input.name !== undefined) patch.name = input.name;
   if (input.type !== undefined) patch.type = input.type;
+  if (input.triggerType !== undefined) patch.trigger_type = input.triggerType;
+  if (input.actionType !== undefined) patch.action_type = input.actionType;
   if (input.description !== undefined) patch.description = input.description;
   if (input.trigger !== undefined) patch.trigger = input.trigger;
+  if (input.conditions !== undefined) patch.conditions = input.conditions;
+  if (input.actionConfig !== undefined) patch.action_config = input.actionConfig;
   if (input.active !== undefined) patch.active = input.active;
   if (input.requiresApproval !== undefined)
     patch.requires_approval = input.requiresApproval;
