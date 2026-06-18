@@ -76,6 +76,17 @@ const ERROR_MESSAGES: Record<string, string> = {
   user_cancelled_login: "Connection cancelled.",
 };
 
+/** Informational notices about a partial Instagram/Meta connection. */
+const IG_MESSAGES: Record<string, string> = {
+  not_professional:
+    "Facebook connected — but no Instagram professional account was found. Convert your Instagram to a Business or Creator account, link it to your Facebook Page, then reconnect to enable Instagram publishing.",
+  missing_publish_permission:
+    "Instagram connected, but the content-publishing permission wasn't granted. Publishing needs the instagram_content_publish permission (and Meta App Review in production). Reconnect and approve it to publish.",
+};
+
+/** Core social providers that use official OAuth (vs. scaffolded providers). */
+const CORE_SOCIAL = new Set(["linkedin", "facebook", "instagram"]);
+
 function isPlatform(id: string): id is Platform {
   return (PLATFORM_IDS as string[]).includes(id);
 }
@@ -119,12 +130,14 @@ function IntegrationCard({
   item,
   live,
   configuredProviders,
+  permissions,
   onDisconnect,
   disconnecting,
 }: {
   item: Integration;
   live: boolean;
   configuredProviders: string[];
+  permissions: string[];
   onDisconnect: (platform: string) => void;
   disconnecting: boolean;
 }) {
@@ -132,6 +145,10 @@ function IntegrationCard({
   // Connectable in demo (showcase) or when the provider's OAuth is configured.
   const connectable = !live || Boolean(oauth?.configured);
   const supportsDisconnect = live && Boolean(oauth);
+  // A configured-on-server core social provider that the user hasn't connected.
+  const needsServerSetup = live && Boolean(oauth) && !oauth?.configured && CORE_SOCIAL.has(item.id);
+  const showPermissions = live && item.status === "connected" && permissions.length > 0;
+  const showInstagramNote = live && item.id === "instagram";
 
   return (
     <div className="group flex h-full flex-col rounded-2xl border border-border bg-card p-5 shadow-soft transition-all duration-300 hover:-translate-y-0.5 hover:shadow-elevated hover:ring-1 hover:ring-brand-200/70">
@@ -160,6 +177,39 @@ function IntegrationCard({
           {setupNotes[item.status]}
         </p>
       </div>
+
+      {showPermissions && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {permissions.slice(0, 4).map((p) => (
+            <span
+              key={p}
+              className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+              title={p}
+            >
+              {p}
+            </span>
+          ))}
+          {permissions.length > 4 && (
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+              +{permissions.length - 4} more
+            </span>
+          )}
+        </div>
+      )}
+
+      {showInstagramNote && (
+        <p className="mt-3 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-[11px] leading-snug text-amber-700">
+          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+          Needs an Instagram professional account + Meta App Review to publish.
+        </p>
+      )}
+
+      {needsServerSetup && (
+        <p className="mt-3 flex items-start gap-1.5 rounded-lg bg-muted/60 px-2.5 py-1.5 text-[11px] leading-snug text-muted-foreground">
+          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+          Not configured on the server — add this app&apos;s OAuth credentials to enable connecting.
+        </p>
+      )}
 
       <div className="mt-4 flex items-center">
         {item.status === "connected" ? (
@@ -195,6 +245,10 @@ function IntegrationCard({
           >
             <Plug className="h-3.5 w-3.5" /> Connect {item.name}
           </a>
+        ) : needsServerSetup ? (
+          <Button size="sm" variant="outline" className="w-full" disabled>
+            Setup required
+          </Button>
         ) : live ? (
           <Button size="sm" variant="outline" className="w-full" disabled>
             Coming soon
@@ -225,6 +279,14 @@ export function IntegrationsView({
 
   const connectedParam = searchParams.get("connected");
   const errorParam = searchParams.get("error");
+  const igParam = searchParams.get("ig");
+
+  // Granted permissions per platform, for the connected social cards.
+  const permsByPlatform = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const a of liveAccounts) map[a.platform] = a.permissions ?? [];
+    return map;
+  }, [liveAccounts]);
 
   // Overlay live connection state onto social integrations when authenticated.
   const items: Integration[] = useMemo(() => {
@@ -346,6 +408,17 @@ export function IntegrationsView({
           </button>
         </div>
       )}
+      {!dismissed && igParam && IG_MESSAGES[igParam] && (
+        <div className="flex items-start justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <span className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            {IG_MESSAGES[igParam]}
+          </span>
+          <button type="button" onClick={() => setDismissed(true)} aria-label="Dismiss">
+            <XIcon className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         {stats.map((s) => (
@@ -409,6 +482,7 @@ export function IntegrationsView({
                     item={item}
                     live={live}
                     configuredProviders={configuredProviders}
+                    permissions={permsByPlatform[item.id] ?? []}
                     onDisconnect={handleDisconnect}
                     disconnecting={isDisconnecting}
                   />

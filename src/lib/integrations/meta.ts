@@ -36,7 +36,14 @@ export async function isMetaConfigured(): Promise<boolean> {
   return Boolean(id && secret);
 }
 
+/**
+ * Redirect URI for the OAuth callback. Honors an explicit `META_REDIRECT_URI`
+ * override (must match the value registered in the Meta app); otherwise it's
+ * derived from the app URL.
+ */
 export function metaRedirectUri(): string {
+  const override = process.env.META_REDIRECT_URI?.trim();
+  if (override) return override;
   const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   return `${base.replace(/\/$/, "")}/api/oauth/meta/callback`;
 }
@@ -111,6 +118,23 @@ export async function listManagedPages(userToken: string): Promise<MetaPage[]> {
     instagramId: p.instagram_business_account?.id ?? null,
     instagramUsername: p.instagram_business_account?.username ?? null,
   }));
+}
+
+/**
+ * The permissions the user actually granted during consent. Authoritative source
+ * for "is publishing allowed?" — a user can decline individual scopes. Returns
+ * only the granted permission names.
+ */
+export async function listGrantedPermissions(userToken: string): Promise<string[]> {
+  const params = new URLSearchParams({ access_token: userToken });
+  const res = await fetch(`${GRAPH}/me/permissions?${params.toString()}`);
+  if (!res.ok) throw new Error(`Meta permissions fetch failed (${res.status}): ${await res.text()}`);
+  const data = (await res.json()) as {
+    data?: { permission: string; status: string }[];
+  };
+  return (data.data ?? [])
+    .filter((p) => p.status === "granted")
+    .map((p) => p.permission);
 }
 
 export interface MetaPublishResult {

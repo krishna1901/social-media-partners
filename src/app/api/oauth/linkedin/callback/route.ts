@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getDbContext, isLive } from "@/lib/db/context";
-import { exchangeCode, fetchProfile } from "@/lib/integrations/linkedin";
+import { exchangeCode, fetchProfile, LINKEDIN_SCOPES } from "@/lib/integrations/linkedin";
 import { storeConnection } from "@/lib/db/social-tokens";
 
 /**
@@ -45,6 +45,12 @@ export async function GET(request: NextRequest) {
     const profile = await fetchProfile(token.accessToken);
     const expiresAt = new Date(Date.now() + token.expiresIn * 1000).toISOString();
 
+    // Granted scopes returned by the token exchange (space- or comma-separated);
+    // fall back to the requested scopes when LinkedIn omits them.
+    const permissions = (token.scope ?? LINKEDIN_SCOPES.join(" "))
+      .split(/[ ,]+/)
+      .filter(Boolean);
+
     await storeConnection(ctx.supabase, {
       workspaceId: ctx.workspaceId,
       userId: ctx.userId,
@@ -56,6 +62,7 @@ export async function GET(request: NextRequest) {
       refreshToken: token.refreshToken,
       scope: token.scope,
       expiresAt,
+      permissions,
     });
 
     const res = NextResponse.redirect(`${appUrl()}/integrations?connected=linkedin`);

@@ -12,7 +12,10 @@ import { createCipheriv, createDecipheriv, randomBytes, createHash } from "crypt
  */
 
 function deriveKey(): Buffer | null {
-  const raw = process.env.TOKEN_ENCRYPTION_KEY;
+  // `SOCIAL_TOKEN_ENCRYPTION_KEY` is an additive alias for `TOKEN_ENCRYPTION_KEY`
+  // (set only one; they must match if both are set — rotating invalidates stored
+  // tokens). `TOKEN_ENCRYPTION_KEY` wins for back-compat with existing deploys.
+  const raw = process.env.TOKEN_ENCRYPTION_KEY || process.env.SOCIAL_TOKEN_ENCRYPTION_KEY;
   if (!raw || raw.length < 16) return null;
   return createHash("sha256").update(raw).digest(); // 32 bytes
 }
