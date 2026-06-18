@@ -719,5 +719,51 @@ revoke execute on function public.is_workspace_member(uuid) from anon;
 revoke execute on function public.is_workspace_admin(uuid) from anon;
 
 -- ============================================================================
+-- Phase B — platform super-admin role, account status, audit log.
+-- ============================================================================
+alter table public.profiles alter column role set default 'member';
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'profiles_role_check') then
+    alter table public.profiles
+      add constraint profiles_role_check check (role in ('member','admin','super_admin'));
+  end if;
+end $$;
+
+alter table public.profiles add column if not exists status text not null default 'active';
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'profiles_status_check') then
+    alter table public.profiles
+      add constraint profiles_status_check check (status in ('active','suspended'));
+  end if;
+end $$;
+
+-- True when the current user is the platform super-admin.
+create or replace function public.is_super_admin()
+returns boolean language sql security definer set search_path = public stable as $$
+  select exists (
+    select 1 from public.profiles where id = auth.uid() and role = 'super_admin'
+  );
+$$;
+revoke execute on function public.is_super_admin() from anon;
+
+-- Platform-wide admin audit log (not workspace-scoped). Writes via the
+-- service-role client; super-admins may read via their own session.
+create table if not exists public.admin_audit_log (
+  id          uuid primary key default gen_random_uuid(),
+  actor_id    uuid references auth.users(id) on delete set null,
+  actor_email text,
+  action      text not null,
+  target_type text,
+  target_id   text,
+  metadata    jsonb,
+  created_at  timestamptz not null default now()
+);
+create index if not exists admin_audit_log_created_idx on public.admin_audit_log (created_at desc);
+alter table public.admin_audit_log enable row level security;
+drop policy if exists admin_audit_super_select on public.admin_audit_log;
+create policy admin_audit_super_select on public.admin_audit_log
+  for select using (public.is_super_admin());
+
+-- ============================================================================
 -- End of schema.
 -- ============================================================================

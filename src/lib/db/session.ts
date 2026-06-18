@@ -12,17 +12,29 @@ export interface SessionView {
   plan: string | null;
   userName: string | null;
   userEmail: string | null;
+  /** Platform super-admin (can access /admin). */
+  isSuperAdmin: boolean;
+  /** Account status: 'active' | 'suspended'. */
+  status: string;
 }
 
 export async function getSessionView(): Promise<SessionView> {
   const ctx = await getDbContext();
   if (!isLive(ctx)) {
-    return { live: false, workspaceName: null, plan: null, userName: null, userEmail: null };
+    return {
+      live: false,
+      workspaceName: null,
+      plan: null,
+      userName: null,
+      userEmail: null,
+      isSuperAdmin: false,
+      status: "active",
+    };
   }
 
   const [wsRes, profileRes] = await Promise.all([
     ctx.supabase.from("workspaces").select("name, plan").eq("id", ctx.workspaceId).maybeSingle(),
-    ctx.supabase.from("profiles").select("full_name, email").eq("id", ctx.userId).maybeSingle(),
+    ctx.supabase.from("profiles").select("full_name, email, role, status").eq("id", ctx.userId).maybeSingle(),
   ]);
 
   const email = (profileRes.data?.email as string | null) ?? null;
@@ -34,5 +46,7 @@ export async function getSessionView(): Promise<SessionView> {
     plan: (wsRes.data?.plan as string | null) ?? null,
     userName: fullName ?? (email ? email.split("@")[0] : null),
     userEmail: email,
+    isSuperAdmin: (profileRes.data?.role as string | null) === "super_admin",
+    status: (profileRes.data?.status as string | null) ?? "active",
   };
 }
