@@ -3,8 +3,9 @@ import { getDbContext, isLive, requireLiveContext } from "@/lib/db/context";
 import type { MediaAssetRow } from "@/lib/db/types";
 import { mediaAssets as demoMediaAssets } from "@/lib/demo-data";
 
-/** Demo-facing shape consumed by the media UI (matches demo `mediaAssets`). */
-export type MappedMedia = (typeof demoMediaAssets)[number];
+/** Demo-facing shape consumed by the media UI (matches demo `mediaAssets`).
+ * `url` is only present for live, storage-backed assets (demo assets omit it). */
+export type MappedMedia = (typeof demoMediaAssets)[number] & { url?: string | null };
 
 /** Fields a create accepts (storage-backed asset metadata). */
 export interface MediaInput {
@@ -84,6 +85,7 @@ function toMappedMedia(row: MediaRowWithPost, index: number): MappedMedia {
     updated: relativeTime(row.updated_at ?? row.created_at),
     linkedPost: row.posts?.title ?? undefined,
     gradient: gradientForIndex(index),
+    url: row.url ?? undefined,
   };
 }
 

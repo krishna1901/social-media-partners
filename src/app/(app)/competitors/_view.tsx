@@ -24,6 +24,7 @@ import { InsightCard } from "@/components/ui/insight-card";
 import { SelectField } from "@/components/ui/select-field";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
 import {
   createCompetitor,
   analyzeContentGapsAction,
@@ -78,6 +79,7 @@ const INITIAL_GAPS: ContentGap[] = [
 
 export function CompetitorsView({ competitors, competitorPosts }: CompetitorsViewProps) {
   const router = useRouter();
+  const toast = useToast();
   const [query, setQuery] = useState("");
   const [niche, setNiche] = useState("all");
   const [platform, setPlatform] = useState("all");
@@ -256,7 +258,18 @@ export function CompetitorsView({ competitors, competitorPosts }: CompetitorsVie
           description="Profiles you're benchmarking against"
           icon={<Users className="h-4 w-4" />}
           action={
-            <Button variant="ghost" size="sm" className="text-muted-foreground">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
+              onClick={() =>
+                toast({
+                  variant: "info",
+                  title: "List management is coming soon",
+                  description: "For now, add or remove competitors with the buttons above.",
+                })
+              }
+            >
               Manage list
             </Button>
           }
@@ -314,7 +327,18 @@ export function CompetitorsView({ competitors, competitorPosts }: CompetitorsVie
         ) : (
           <div className="grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filtered.map((c) => (
-              <CompetitorCard key={c.id} competitor={c} className="h-full" />
+              <CompetitorCard
+                key={c.id}
+                competitor={c}
+                className="h-full"
+                onViewPosts={(comp) =>
+                  toast({
+                    variant: "info",
+                    title: `Post breakdown coming soon`,
+                    description: `A detailed post history for ${comp.name} will live here. See "What's working" below for highlights.`,
+                  })
+                }
+              />
             ))}
           </div>
         )}

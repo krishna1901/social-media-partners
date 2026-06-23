@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { PageTransition } from "@/components/motion/page-transition";
+import { ToastProvider } from "@/components/ui/toast";
 import { stopImpersonationAction } from "@/app/actions/admin";
 import type { SessionView } from "@/lib/db/session";
 
@@ -19,6 +20,7 @@ export function AppShell({
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
+    <ToastProvider>
     <div className="flex h-screen flex-col overflow-hidden bg-background">
       {impersonating && (
         <div className="flex shrink-0 items-center justify-center gap-3 bg-amber-500 px-4 py-1.5 text-xs font-semibold text-white">
@@ -57,5 +59,6 @@ export function AppShell({
         </div>
       </div>
     </div>
+    </ToastProvider>
   );
 }

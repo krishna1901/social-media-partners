@@ -1,12 +1,11 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { BarChart3, Download, CalendarCheck, Rocket, LayoutGrid } from "lucide-react";
+import { BarChart3, CalendarCheck, Rocket, LayoutGrid } from "lucide-react";
 import { StatCard } from "@/components/ui/stat-card";
 import { ChartCard } from "@/components/ui/chart-card";
 import { InsightCard } from "@/components/ui/insight-card";
 import { PageHeader } from "@/components/ui/page-header";
-import { Button } from "@/components/ui/button";
 import { SelectField } from "@/components/ui/select-field";
 import { Progress } from "@/components/ui/progress";
 import { PlatformBadge, PlatformChip } from "@/components/ui/platform-badge";
@@ -60,10 +59,12 @@ const maxHoursPerDay = Math.max(...bestPostingTimes.map((d) => d.hours.length));
 
 export function AnalyticsView({
   syncControl,
+  exportControl,
   liveStrip,
   demo,
 }: {
   syncControl?: ReactNode;
+  exportControl?: ReactNode;
   liveStrip?: ReactNode;
   demo: boolean;
 }) {
@@ -96,9 +97,7 @@ export function AnalyticsView({
               defaultValue="All platforms"
               className="w-36"
             />
-            <Button variant="outline">
-              <Download className="h-4 w-4" /> Export
-            </Button>
+            {exportControl}
           </>
         }
       />

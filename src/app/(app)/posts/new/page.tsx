@@ -38,6 +38,7 @@ import { UploadDropzone } from "@/components/ui/upload-dropzone";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PlatformBadge } from "@/components/ui/platform-badge";
 import { PlatformIcon } from "@/components/ui/platform-icon";
+import { useToast } from "@/components/ui/toast";
 import { platformMeta, type Platform } from "@/lib/demo-data";
 import { cn } from "@/lib/utils";
 import { createPost, setPostChannels, schedulePostAction } from "@/app/actions/posts";
@@ -90,6 +91,7 @@ async function imageSize(file: File): Promise<{ width: number; height: number } 
 
 export default function NewPostPage() {
   const router = useRouter();
+  const toast = useToast();
   const [pending, startTransition] = useTransition();
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -132,7 +134,7 @@ export default function NewPostPage() {
 
   // Persist the post + its selected channels; returns the new id, or null on error.
   const persistPost = async (
-    status: "draft" | "scheduled"
+    status: "draft" | "ready" | "scheduled"
   ): Promise<string | null> => {
     const created = await createPost(
       { ...composerInput(), status },
@@ -156,6 +158,70 @@ export default function NewPostPage() {
       const id = await persistPost("draft");
       if (id) router.push("/posts");
     });
+  };
+
+  const handleMarkReady = () => {
+    setSaveError(null);
+    startTransition(async () => {
+      const id = await persistPost("ready");
+      if (id) {
+        toast({
+          variant: "success",
+          title: "Marked as ready",
+          description: "Saved to your posts, ready to schedule.",
+        });
+        router.push("/posts");
+      }
+    });
+  };
+
+  // Copy the composed post (title, captions, hashtags, CTA) to the clipboard so
+  // it can be pasted into any external tool.
+  const handleExportCopy = async () => {
+    const text = [
+      title && `${title}`,
+      universalCaption.trim(),
+      igCaption.trim() && `\nInstagram:\n${igCaption.trim()}`,
+      liCaption.trim() && `\nLinkedIn:\n${liCaption.trim()}`,
+      hashtags.trim() && `\n${hashtags.trim()}`,
+      cta.trim() && `\n${cta.trim()}`,
+    ]
+      .filter(Boolean)
+      .join("\n")
+      .trim();
+
+    if (!text) {
+      toast({
+        variant: "info",
+        title: "Nothing to copy yet",
+        description: "Add a caption, hashtags or a CTA first.",
+      });
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({
+        variant: "success",
+        title: "Copied to clipboard",
+        description: "Paste your composed post anywhere.",
+      });
+    } catch {
+      toast({
+        variant: "error",
+        title: "Couldn't copy",
+        description: "Clipboard access was blocked by your browser.",
+      });
+    }
+  };
+
+  // The inline AI tools live in Content Studio; open it without losing this draft.
+  const openAiTool = (label: string) => {
+    toast({
+      variant: "info",
+      title: "Opening Content Studio",
+      description: `Use the ${label} tool, then paste the result back into your draft.`,
+    });
+    window.open("/content-studio", "_blank", "noopener,noreferrer");
   };
 
   const handleSchedule = () => {
@@ -251,7 +317,9 @@ export default function NewPostPage() {
             <Button variant="ghost" onClick={handleSaveDraft} disabled={pending}>
               Save draft
             </Button>
-            <Button variant="outline">Mark ready</Button>
+            <Button variant="outline" onClick={handleMarkReady} disabled={pending}>
+              Mark ready
+            </Button>
             <Button
               onClick={handleSchedule}
               disabled={pending}
@@ -536,6 +604,7 @@ export default function NewPostPage() {
                 <button
                   key={action.label}
                   type="button"
+                  onClick={() => openAiTool(action.label)}
                   className="group/ai flex w-full items-center gap-3 rounded-xl border border-border bg-card px-3 py-2.5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-sm"
                 >
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-brand-50 to-coral-50 text-brand-500 ring-1 ring-brand-100">
@@ -603,7 +672,7 @@ export default function NewPostPage() {
                 </p>
               )}
 
-              <Button variant="outline" className="w-full">
+              <Button variant="outline" className="w-full" onClick={handleExportCopy}>
                 <Copy className="h-4 w-4" /> Export / copy manually
               </Button>
             </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   RefreshCw,
   Radio,
@@ -21,6 +21,7 @@ import { Segmented } from "@/components/ui/segmented";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Stagger, StaggerItem } from "@/components/motion/stagger";
+import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import { integrations, type Platform } from "@/lib/demo-data";
 import type { MappedConnectedAccount } from "@/lib/db/settings";
@@ -127,6 +128,7 @@ function ChannelCard({
   onDisconnect: (platform: string) => void;
   disconnecting: boolean;
 }) {
+  const toast = useToast();
   const oauth = oauthStartFor(item.id, configuredProviders);
   // Connectable in demo (showcase) or when the provider's OAuth is configured.
   const connectable = !live || Boolean(oauth?.configured);
@@ -210,7 +212,18 @@ function ChannelCard({
               <XIcon className="h-3.5 w-3.5" /> Disconnect
             </Button>
           ) : (
-            <Button variant="outline" size="sm" className="w-full">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={() =>
+                toast({
+                  variant: "info",
+                  title: `${item.name} is connected`,
+                  description: "Detailed management controls for this channel are coming soon.",
+                })
+              }
+            >
               Manage
             </Button>
           )
@@ -240,7 +253,17 @@ function ChannelCard({
             Coming soon
           </Button>
         ) : (
-          <Button size="sm" className={`w-full bg-gradient-to-r text-white hover:opacity-90 ${item.accent}`}>
+          <Button
+            size="sm"
+            className={`w-full bg-gradient-to-r text-white hover:opacity-90 ${item.accent}`}
+            onClick={() =>
+              toast({
+                variant: "info",
+                title: `Connect ${item.name}`,
+                description: "Sign in to your workspace to link this channel.",
+              })
+            }
+          >
             <Plug className="h-3.5 w-3.5" /> Connect
           </Button>
         )}
@@ -261,7 +284,14 @@ export function IntegrationsView({
   const [status, setStatus] = useState<StatusFilter>("all");
   const [dismissed, setDismissed] = useState(false);
   const [isDisconnecting, startDisconnect] = useTransition();
+  const router = useRouter();
+  const toast = useToast();
   const searchParams = useSearchParams();
+
+  function handleRefresh() {
+    router.refresh();
+    toast({ variant: "info", title: "Refreshing channels", description: "Pulling the latest connection status." });
+  }
 
   const connectedParam = searchParams.get("connected");
   const errorParam = searchParams.get("error");
@@ -360,7 +390,7 @@ export function IntegrationsView({
             <span className="hidden items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300 sm:inline-flex">
               <CheckCircle2 className="h-3.5 w-3.5" /> {connected} live
             </span>
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" onClick={handleRefresh}>
               <RefreshCw className="h-4 w-4" /> Refresh status
             </Button>
           </>

@@ -34,9 +34,10 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { ContentTypeBadge } from "@/components/ui/content-type-badge";
 import { PlatformStack, PlatformBadge } from "@/components/ui/platform-badge";
 import { Avatar } from "@/components/ui/avatar";
+import { useToast } from "@/components/ui/toast";
 import { platformMeta, type Platform, type PostStatus, type PostType } from "@/lib/demo-data";
 import type { listPosts, getPostCounts } from "@/lib/db/posts";
-import { duplicatePost, archivePost } from "@/app/actions/posts";
+import { duplicatePost, archivePost, deletePost } from "@/app/actions/posts";
 
 type Post = Awaited<ReturnType<typeof listPosts>>[number];
 type Counts = Awaited<ReturnType<typeof getPostCounts>>;
@@ -131,6 +132,7 @@ function SavedFilters() {
 
 export function PostsView({ posts, counts }: PostsViewProps) {
   const router = useRouter();
+  const toast = useToast();
   const [pending, startTransition] = useTransition();
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -223,6 +225,37 @@ export function PostsView({ posts, counts }: PostsViewProps) {
       return next;
     });
   }, [allSelected, filteredIds]);
+
+  // Apply a posts mutation to every selected (and visible) post at once.
+  const runBulk = useCallback(
+    (
+      label: string,
+      action: (id: string) => Promise<{ ok: true; id: string } | { ok: false; error: string }>
+    ) => {
+      const ids = filtered.filter((p) => selected.has(p.id)).map((p) => p.id);
+      if (ids.length === 0) return;
+      setActionError(null);
+      startTransition(async () => {
+        const results = await Promise.all(ids.map((id) => action(id)));
+        const failed = results.filter((r) => !r.ok).length;
+        setSelected(new Set());
+        router.refresh();
+        if (failed > 0) {
+          toast({
+            variant: "error",
+            title: "Some posts couldn't be updated",
+            description: `${ids.length - failed} of ${ids.length} ${label} successfully.`,
+          });
+        } else {
+          toast({
+            variant: "success",
+            title: `${ids.length} post${ids.length === 1 ? "" : "s"} ${label}`,
+          });
+        }
+      });
+    },
+    [filtered, selected, router, toast]
+  );
 
   const columns: Column<Post>[] = useMemo(
     () => [
@@ -439,16 +472,49 @@ export function PostsView({ posts, counts }: PostsViewProps) {
             </button>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                toast({
+                  variant: "info",
+                  title: "Bulk scheduling is coming soon",
+                  description: "For now, schedule posts one at a time from the composer.",
+                })
+              }
+            >
               <CalendarClock className="h-4 w-4" /> Schedule
             </Button>
-            <Button variant="outline" size="sm">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pending}
+              onClick={() => runBulk("duplicated", duplicatePost)}
+            >
               <Copy className="h-4 w-4" /> Duplicate
             </Button>
-            <Button variant="outline" size="sm">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pending}
+              onClick={() => runBulk("archived", archivePost)}
+            >
               <Archive className="h-4 w-4" /> Archive
             </Button>
-            <Button variant="destructive" size="sm">
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={pending}
+              onClick={() => {
+                if (
+                  window.confirm(
+                    `Delete ${visibleSelectedCount} post${visibleSelectedCount === 1 ? "" : "s"}? This can't be undone.`
+                  )
+                ) {
+                  runBulk("deleted", deletePost);
+                }
+              }}
+            >
               <Trash2 className="h-4 w-4" /> Delete
             </Button>
           </div>
@@ -488,9 +554,11 @@ export function PostsView({ posts, counts }: PostsViewProps) {
         footer={
           preview && (
             <div className="flex items-center justify-between gap-2">
-              <Button variant="outline" size="sm">
-                <Pencil className="h-4 w-4" /> Quick edit
-              </Button>
+              <Link href="/posts/new">
+                <Button variant="outline" size="sm">
+                  <Pencil className="h-4 w-4" /> Quick edit
+                </Button>
+              </Link>
               <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"

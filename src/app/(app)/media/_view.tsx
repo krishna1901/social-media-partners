@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   UploadCloud,
@@ -32,6 +32,7 @@ import { Segmented } from "@/components/ui/segmented";
 import { Drawer } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import { uploadMedia, type MediaKind } from "@/lib/storage";
 import {
@@ -108,6 +109,8 @@ function kindForFile(file: File): MediaKind {
 
 export function MediaView({ assets, posts, storageLabel }: MediaViewProps) {
   const router = useRouter();
+  const toast = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -154,6 +157,45 @@ export function MediaView({ assets, posts, storageLabel }: MediaViewProps) {
         setError(err instanceof Error ? err.message : "Upload failed.");
       }
     });
+  };
+
+  const openFilePicker = () => fileInputRef.current?.click();
+
+  const handleDownload = (asset: MediaAsset) => {
+    if (!asset.url) {
+      toast({
+        variant: "info",
+        title: "Nothing to download",
+        description: "This sample asset has no stored file. Upload your own to download it.",
+      });
+      return;
+    }
+    const a = document.createElement("a");
+    a.href = asset.url;
+    a.download = asset.name;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    toast({ variant: "success", title: "Download started", description: asset.name });
+  };
+
+  const handleCopyUrl = async (asset: MediaAsset) => {
+    if (!asset.url) {
+      toast({
+        variant: "info",
+        title: "No URL to copy",
+        description: "This sample asset isn't backed by storage yet.",
+      });
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(asset.url);
+      toast({ variant: "success", title: "URL copied", description: "Asset link copied to clipboard." });
+    } catch {
+      toast({ variant: "error", title: "Couldn't copy", description: "Clipboard access was blocked." });
+    }
   };
 
   const handleLink = (mediaId: string, postId: string) => {
@@ -249,11 +291,22 @@ export function MediaView({ assets, posts, storageLabel }: MediaViewProps) {
                 { value: "list", label: "List", icon: ListIcon },
               ]}
             />
-            <Button variant="gradient">
+            <Button variant="gradient" onClick={openFilePicker} disabled={pending}>
               <UploadCloud className="h-4 w-4" /> Upload
             </Button>
           </>
         }
+      />
+
+      {/* Hidden picker shared by the header / empty-state Upload buttons. */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files?.length) handleUpload(e.target.files);
+          e.target.value = "";
+        }}
       />
 
       {/* Stats */}
@@ -349,7 +402,7 @@ export function MediaView({ assets, posts, storageLabel }: MediaViewProps) {
                   Clear filters
                 </Button>
               )}
-              <Button variant="gradient" size="sm">
+              <Button variant="gradient" size="sm" onClick={openFilePicker} disabled={pending}>
                 <UploadCloud className="h-4 w-4" /> Upload
               </Button>
             </div>
@@ -450,10 +503,20 @@ export function MediaView({ assets, posts, storageLabel }: MediaViewProps) {
         footer={
           selected && (
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" className="flex-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => handleDownload(selected)}
+              >
                 <Download className="h-4 w-4" /> Download
               </Button>
-              <Button variant="outline" size="sm" className="flex-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => handleCopyUrl(selected)}
+              >
                 <Copy className="h-4 w-4" /> Copy URL
               </Button>
               <Button

@@ -27,6 +27,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { PlatformIcon } from "@/components/ui/platform-icon";
 import { InboxThread } from "@/components/ui/inbox-thread";
 import { EmptyState } from "@/components/ui/empty-state";
+import { useToast } from "@/components/ui/toast";
 import { platformMeta } from "@/lib/demo-data";
 import { markReplied, markIgnored, saveReplyDraft, sendReply, syncInboxAction } from "@/app/actions/inbox";
 import type { listInbox } from "@/lib/db/inbox";
@@ -53,6 +54,7 @@ const typeLabel: Record<string, string> = { comment: "Comment", dm: "Direct mess
 
 export function InboxView({ threads }: InboxViewProps) {
   const router = useRouter();
+  const toast = useToast();
   const [tab, setTab] = useState("all");
   const [selectedId, setSelectedId] = useState(threads[0]?.id ?? "");
   const [platform, setPlatform] = useState("all");
@@ -149,6 +151,34 @@ export function InboxView({ threads }: InboxViewProps) {
     runAction(() => saveReplyDraft(selected.id, suggestion));
   };
 
+  // Clear every unread (new) conversation at once by marking them replied.
+  const handleMarkAllRead = () => {
+    const unread = threads.filter((t) => t.status === "new");
+    if (unread.length === 0) {
+      toast({ variant: "info", title: "Inbox zero", description: "No unread conversations to clear." });
+      return;
+    }
+    setError(null);
+    startTransition(async () => {
+      const results = await Promise.all(unread.map((t) => markReplied(t.id)));
+      const failed = results.filter((r) => !r.ok).length;
+      router.refresh();
+      if (failed > 0) {
+        toast({
+          variant: "error",
+          title: "Some couldn't be updated",
+          description: `${unread.length - failed} of ${unread.length} marked as read.`,
+        });
+      } else {
+        toast({
+          variant: "success",
+          title: "Inbox marked read",
+          description: `${unread.length} conversation${unread.length === 1 ? "" : "s"} cleared.`,
+        });
+      }
+    });
+  };
+
   const summary = [
     { label: "Unread", value: unreadCount, icon: <MessageSquare className="h-4 w-4" />, tint: "bg-brand-50 text-brand-600" },
     { label: "Positive", value: `${positivePct}%`, icon: <Smile className="h-4 w-4" />, tint: "bg-emerald-50 text-emerald-600" },
@@ -175,7 +205,7 @@ export function InboxView({ threads }: InboxViewProps) {
               <RefreshCw className={`h-4 w-4${isSyncing ? " animate-spin" : ""}`} />
               {isSyncing ? "Syncing…" : "Sync"}
             </Button>
-            <Button variant="outline">
+            <Button variant="outline" onClick={handleMarkAllRead} disabled={pending}>
               <Check className="h-4 w-4" /> Mark all read
             </Button>
           </>
@@ -393,7 +423,17 @@ export function InboxView({ threads }: InboxViewProps) {
                     <Button variant="ghost" size="sm" onClick={handleIgnore} disabled={pending}>
                       <X className="h-4 w-4" /> Ignore
                     </Button>
-                    <Button variant="ghost" size="sm">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        toast({
+                          variant: "info",
+                          title: "Assignment is coming soon",
+                          description: "Soon you'll be able to route this conversation to a teammate.",
+                        })
+                      }
+                    >
                       <UserPlus className="h-4 w-4" /> Assign
                     </Button>
                   </div>

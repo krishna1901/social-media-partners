@@ -28,6 +28,7 @@ import { Switch } from "@/components/ui/switch";
 import { SelectField } from "@/components/ui/select-field";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PlatformIcon } from "@/components/ui/platform-icon";
+import { useToast } from "@/components/ui/toast";
 import { studioToneOptions, platformMeta, type Platform } from "@/lib/demo-data";
 import {
   updateSettings,
@@ -108,6 +109,7 @@ function Panel({
   children,
   saveLabel = "Save changes",
   onSave,
+  onCancel,
   saving = false,
   message,
 }: {
@@ -117,6 +119,7 @@ function Panel({
   children: React.ReactNode;
   saveLabel?: string;
   onSave?: () => void;
+  onCancel?: () => void;
   saving?: boolean;
   message?: { tone: "success" | "error"; text: string } | null;
 }) {
@@ -145,12 +148,16 @@ function Panel({
           </span>
         )}
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm">
-            Cancel
-          </Button>
-          <Button size="sm" variant="gradient" onClick={onSave} disabled={saving}>
-            <Save className="h-3.5 w-3.5" /> {saveLabel}
-          </Button>
+          {onCancel && (
+            <Button variant="ghost" size="sm" onClick={onCancel} disabled={saving}>
+              Cancel
+            </Button>
+          )}
+          {onSave && (
+            <Button size="sm" variant="gradient" onClick={onSave} disabled={saving}>
+              <Save className="h-3.5 w-3.5" /> {saveLabel}
+            </Button>
+          )}
         </div>
       </div>
     </section>
@@ -169,6 +176,7 @@ const notificationPrefs: { id: string; label: string; desc: string; default: boo
 
 export function SettingsView({ settings, connectedAccounts }: SettingsViewProps) {
   const router = useRouter();
+  const toast = useToast();
   const [active, setActive] = useState<SectionId>("profile");
 
   const [notifs, setNotifs] = useState<Record<string, boolean>>({
@@ -201,6 +209,34 @@ export function SettingsView({ settings, connectedAccounts }: SettingsViewProps)
   const [channelMessage, setChannelMessage] = useState<
     { tone: "success" | "error"; text: string } | null
   >(null);
+
+  // Revert every editable field to the last saved values (Cancel button).
+  const resetEdits = () => {
+    setBrandName(settings.brandName);
+    setTagline(settings.tagline);
+    setTimezone(settings.timezone);
+    setDefaultTone(settings.defaultTone);
+    setDefaultCTA(settings.defaultCTA);
+    setDefaultHashtags(settings.defaultHashtags);
+    setNotifs({
+      ...Object.fromEntries(notificationPrefs.map((p) => [p.id, p.default])),
+      ...settings.notificationPrefs,
+    });
+    setAutoQueue(settings.postingPrefs.autoQueue);
+    setBestTime(settings.postingPrefs.bestTime);
+    setDefaultWindow(settings.postingPrefs.defaultWindow);
+    setPostsPerDay(
+      settings.postingPrefs.postsPerDay === 0
+        ? "Unlimited"
+        : String(settings.postingPrefs.postsPerDay)
+    );
+    setPanelMessage(null);
+    toast({
+      variant: "info",
+      title: "Changes discarded",
+      description: "Reverted to your last saved settings.",
+    });
+  };
 
   const saveSettings = () => {
     setPanelMessage(null);
@@ -293,7 +329,17 @@ export function SettingsView({ settings, connectedAccounts }: SettingsViewProps)
         description="Manage your profile, workspace, brand and preferences."
         actions={
           <>
-            <Button variant="outline" size="sm">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                toast({
+                  variant: "info",
+                  title: "Changelog is coming soon",
+                  description: "Product updates and release notes will appear here.",
+                })
+              }
+            >
               View changelog
             </Button>
             <Button size="sm" variant="gradient" onClick={saveSettings} disabled={saving}>
@@ -397,15 +443,47 @@ export function SettingsView({ settings, connectedAccounts }: SettingsViewProps)
         {/* Right panels */}
         <div className="space-y-6 lg:col-span-9">
           {active === "profile" && (
-            <Panel title="Profile" description="Your personal account details." icon={User}>
+            <Panel
+              title="Profile"
+              description="Your personal account details."
+              icon={User}
+              saveLabel="Save profile"
+              onSave={() =>
+                toast({
+                  variant: "info",
+                  title: "Profile editing is coming soon",
+                  description: "Workspace, brand and content defaults can be saved today.",
+                })
+              }
+            >
               <div className="flex items-center gap-4">
                 <Avatar initials="AR" size="lg" ring />
                 <div className="space-y-1.5">
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        toast({
+                          variant: "info",
+                          title: "Avatar upload is coming soon",
+                          description: "You'll be able to set a profile photo here shortly.",
+                        })
+                      }
+                    >
                       Upload photo
                     </Button>
-                    <Button variant="ghost" size="sm">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        toast({
+                          variant: "info",
+                          title: "Avatar upload is coming soon",
+                          description: "Custom profile photos aren't available yet.",
+                        })
+                      }
+                    >
                       Remove
                     </Button>
                   </div>
@@ -441,6 +519,7 @@ export function SettingsView({ settings, connectedAccounts }: SettingsViewProps)
               description="Settings shared across your team."
               icon={Building2}
               onSave={saveSettings}
+              onCancel={resetEdits}
               saving={saving}
               message={panelMessage}
             >
@@ -476,6 +555,7 @@ export function SettingsView({ settings, connectedAccounts }: SettingsViewProps)
               description="How your brand appears across generated content."
               icon={Palette}
               onSave={saveSettings}
+              onCancel={resetEdits}
               saving={saving}
               message={panelMessage}
             >
@@ -505,6 +585,7 @@ export function SettingsView({ settings, connectedAccounts }: SettingsViewProps)
               description="Defaults applied when generating new content."
               icon={Sparkles}
               onSave={saveSettings}
+              onCancel={resetEdits}
               saving={saving}
               message={panelMessage}
             >
@@ -536,6 +617,7 @@ export function SettingsView({ settings, connectedAccounts }: SettingsViewProps)
               description="Choose what we email and notify you about."
               icon={Bell}
               onSave={saveNotifications}
+              onCancel={resetEdits}
               saving={saving}
               message={panelMessage}
             >
@@ -566,6 +648,7 @@ export function SettingsView({ settings, connectedAccounts }: SettingsViewProps)
               description="Control how posts are queued and scheduled."
               icon={Clock}
               onSave={savePosting}
+              onCancel={resetEdits}
               saving={saving}
               message={panelMessage}
             >
@@ -679,7 +762,11 @@ export function SettingsView({ settings, connectedAccounts }: SettingsViewProps)
                           Reconnect
                         </Button>
                       ) : isConnected ? (
-                        <Button variant="outline" size="sm">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => router.push("/integrations")}
+                        >
                           Manage
                         </Button>
                       ) : (

@@ -30,7 +30,20 @@ function Stat({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-export function CompetitorCard({ competitor, className }: { competitor: CompetitorCardData; className?: string }) {
+/** Ensure a competitor URL is absolute so it opens as an external link. */
+function externalUrl(url: string): string {
+  return /^https?:\/\//i.test(url) ? url : `https://${url}`;
+}
+
+export function CompetitorCard({
+  competitor,
+  className,
+  onViewPosts,
+}: {
+  competitor: CompetitorCardData;
+  className?: string;
+  onViewPosts?: (competitor: CompetitorCardData) => void;
+}) {
   return (
     <div className={cn("flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm transition-all hover:shadow-md", className)}>
       <div className="flex items-start justify-between gap-3">
@@ -56,10 +69,22 @@ export function CompetitorCard({ competitor, className }: { competitor: Competit
       </div>
 
       <div className="mt-auto flex items-center gap-2 border-t border-border pt-3">
-        <Button size="sm" variant="outline" className="flex-1">
+        <Button
+          size="sm"
+          variant="outline"
+          className="flex-1"
+          onClick={() => onViewPosts?.(competitor)}
+        >
           <Eye className="h-3.5 w-3.5" /> View posts
         </Button>
-        <Button size="sm" variant="ghost" className="text-muted-foreground">
+        <Button
+          size="sm"
+          variant="ghost"
+          className="text-muted-foreground"
+          render={
+            <a href={externalUrl(competitor.url)} target="_blank" rel="noopener noreferrer" />
+          }
+        >
           <ExternalLink className="h-3.5 w-3.5" /> Profile
         </Button>
       </div>

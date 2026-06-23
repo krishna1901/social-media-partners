@@ -1,10 +1,11 @@
 import { CheckCircle2 } from "lucide-react";
 import { PlatformBadge } from "@/components/ui/platform-badge";
-import { getAnalyticsSummary } from "@/lib/db/analytics";
+import { getAnalyticsSummary, getAnalyticsExport } from "@/lib/db/analytics";
 import type { Platform } from "@/lib/demo-data";
 import { formatNumber } from "@/lib/demo-data";
 import { AnalyticsView } from "./_view";
 import { AnalyticsSyncButton } from "./_sync-button";
+import { AnalyticsExportButton } from "./_export-button";
 
 /**
  * Analytics (server) — adds a "Sync now" control and, when synced live data
@@ -12,7 +13,10 @@ import { AnalyticsSyncButton } from "./_sync-button";
  * preview keeps the existing visualizations unchanged.
  */
 export default async function AnalyticsPage() {
-  const summary = await getAnalyticsSummary();
+  const [summary, exportData] = await Promise.all([
+    getAnalyticsSummary(),
+    getAnalyticsExport(),
+  ]);
 
   const liveStrip =
     summary.live && summary.platforms.length > 0 ? (
@@ -41,5 +45,12 @@ export default async function AnalyticsPage() {
       </div>
     ) : null;
 
-  return <AnalyticsView syncControl={<AnalyticsSyncButton />} liveStrip={liveStrip} demo={!summary.live} />;
+  return (
+    <AnalyticsView
+      syncControl={<AnalyticsSyncButton />}
+      exportControl={<AnalyticsExportButton data={exportData} />}
+      liveStrip={liveStrip}
+      demo={!summary.live}
+    />
+  );
 }

@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/toast";
 import {
   studioTools,
   studioToneOptions,
@@ -64,6 +65,15 @@ export function ContentStudioView({
   aiConfigured: boolean;
 }) {
   const router = useRouter();
+  const toast = useToast();
+
+  // Surfaces a "coming soon" notice for the generation-history views.
+  const comingSoon = () =>
+    toast({
+      variant: "info",
+      title: "Generation history is coming soon",
+      description: "Your recent generations already appear in the side panel for quick reuse.",
+    });
 
   const [activeTool, setActiveTool] = useState<AIToolId>("hook");
   const [status, setStatus] = useState<Status>("idle");
@@ -194,7 +204,7 @@ export function ContentStudioView({
               <Sparkles className="h-3.5 w-3.5" />
               <span className="tabular-nums">1,240</span> credits left
             </span>
-            <Button variant="ghost">
+            <Button variant="ghost" onClick={comingSoon}>
               <History className="h-4 w-4" /> View history
             </Button>
           </>
@@ -473,7 +483,11 @@ export function ContentStudioView({
           <ChartCard
             title="Recent generations"
             action={
-              <button type="button" className="text-xs font-semibold text-brand-600 hover:underline">
+              <button
+                type="button"
+                onClick={comingSoon}
+                className="text-xs font-semibold text-brand-600 hover:underline"
+              >
                 View all
               </button>
             }

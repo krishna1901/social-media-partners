@@ -17,8 +17,11 @@ import {
 import { CommandBar } from "@/components/ui/command-bar";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { useToast } from "@/components/ui/toast";
 import { notifications as demoNotifications } from "@/lib/demo-data";
 import { cn } from "@/lib/utils";
+
+type Notification = (typeof demoNotifications)[number];
 
 const createOptions = [
   { title: "New post", desc: "Compose & schedule", href: "/posts/new", icon: PenSquare },
@@ -36,11 +39,25 @@ const notifKindColor: Record<string, string> = {
 
 export function Header({ onMenuClick, live }: { onMenuClick?: () => void; live?: boolean }) {
   const router = useRouter();
+  const toast = useToast();
   const [createOpen, setCreateOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   // Live accounts have no notification feed yet → empty; demo shows the showcase.
-  const notifications = live ? [] : demoNotifications;
+  // Held in state so "Mark all read" can update the unread badge in place.
+  const [notifications, setNotifications] = useState<Notification[]>(() =>
+    live ? [] : demoNotifications.map((n) => ({ ...n }))
+  );
   const unread = notifications.filter((n) => n.unread).length;
+
+  function markAllRead() {
+    if (unread === 0) return;
+    setNotifications((current) => current.map((n) => ({ ...n, unread: false })));
+    toast({
+      variant: "success",
+      title: "All caught up",
+      description: `Marked ${unread} ${unread === 1 ? "notification" : "notifications"} as read.`,
+    });
+  }
 
   return (
     <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between gap-3 border-b border-border/70 bg-card/70 px-4 backdrop-blur-xl lg:px-6">
@@ -124,12 +141,18 @@ export function Header({ onMenuClick, live }: { onMenuClick?: () => void; live?:
               <div className="absolute right-0 z-20 mt-2 w-80 overflow-hidden rounded-2xl border border-border bg-card shadow-elevated animate-in fade-in zoom-in-95 duration-150">
                 <div className="flex items-center justify-between border-b border-border px-4 py-3">
                   <p className="text-sm font-semibold text-foreground">Notifications</p>
-                  {notifications.length > 0 && (
-                    <button className="text-xs font-medium text-brand-600 hover:underline">Mark all read</button>
+                  {unread > 0 && (
+                    <button
+                      type="button"
+                      onClick={markAllRead}
+                      className="text-xs font-medium text-brand-600 transition-colors hover:underline"
+                    >
+                      Mark all read
+                    </button>
                   )}
                 </div>
                 <div className="max-h-80 overflow-y-auto scrollbar-thin">
-                  {notifications.length === 0 ? (
+                  {unread === 0 ? (
                     <div className="px-4 py-10 text-center">
                       <p className="text-sm font-medium text-foreground">You&apos;re all caught up</p>
                       <p className="mt-1 text-xs text-muted-foreground">New activity will show up here.</p>
