@@ -85,11 +85,15 @@ export async function updateSettings(
   return data as SettingsRow;
 }
 
-/** Connected integration accounts. Empty-array fallback in demo mode. */
+/**
+ * Connected integration accounts (with granted permissions for display). Empty-
+ * array fallback in demo mode. Only the scope/permission names are surfaced —
+ * never the encrypted tokens, which stay server-only.
+ */
 export type MappedConnectedAccount = Pick<
   ConnectedAccountRow,
   "id" | "platform" | "account_name" | "account_handle" | "status" | "last_sync_at"
->;
+> & { permissions: string[] };
 
 export async function listConnectedAccounts(): Promise<MappedConnectedAccount[]> {
   const ctx = await getDbContext();
@@ -102,7 +106,29 @@ export async function listConnectedAccounts(): Promise<MappedConnectedAccount[]>
     .order("platform", { ascending: true });
 
   if (error || !data) return [];
-  return data as MappedConnectedAccount[];
+
+  // Attach granted permissions per account (best-effort; scope names only).
+  const { data: perms } = await ctx.supabase
+    .from("platform_permissions")
+    .select("connected_account_id, permission, granted")
+    .eq("workspace_id", ctx.workspaceId);
+
+  const byAccount = new Map<string, string[]>();
+  for (const p of (perms ?? []) as {
+    connected_account_id: string | null;
+    permission: string;
+    granted: boolean;
+  }[]) {
+    if (!p.granted || !p.connected_account_id) continue;
+    const list = byAccount.get(p.connected_account_id) ?? [];
+    list.push(p.permission);
+    byAccount.set(p.connected_account_id, list);
+  }
+
+  return (data as Omit<MappedConnectedAccount, "permissions">[]).map((a) => ({
+    ...a,
+    permissions: byAccount.get(a.id) ?? [],
+  }));
 }
 
 export interface ConnectedAccountInput {

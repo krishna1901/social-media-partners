@@ -1,5 +1,6 @@
 import "server-only";
 import { getDbContext, isLive, requireLiveContext } from "@/lib/db/context";
+import { sendPlatformReply, type ReplyStatus } from "@/lib/automations/reply";
 import type { InboxRow } from "@/lib/db/types";
 import { inboxThreads as demoInbox } from "@/lib/demo-data";
 
@@ -113,6 +114,47 @@ export async function saveReplyDraft(id: string, draft: string): Promise<InboxRo
 
 export async function markReplied(id: string): Promise<InboxRow> {
   return updateInboxStatus(id, "replied");
+}
+
+/**
+ * Human-in-the-loop reply: posts `text` to the platform via the reply
+ * dispatcher (simulate-safe), then saves the draft and marks the item replied.
+ * On an honest send failure (simulate off) the draft is persisted and the error
+ * is surfaced so the item stays actionable.
+ */
+export async function sendReply(
+  id: string,
+  text: string
+): Promise<{ row: InboxRow; status: ReplyStatus; message: string }> {
+  const ctx = await requireLiveContext();
+  const { data: existing, error: fetchErr } = await ctx.supabase
+    .from("comments_inbox")
+    .select("*")
+    .eq("id", id)
+    .eq("workspace_id", ctx.workspaceId)
+    .single();
+  if (fetchErr || !existing) throw fetchErr ?? new Error("Inbox item not found.");
+
+  const result = await sendPlatformReply(ctx.supabase, existing as InboxRow, text);
+  if (!result.ok) {
+    // Persist the draft so the human can retry; leave status unchanged.
+    await ctx.supabase
+      .from("comments_inbox")
+      .update({ reply_draft: text })
+      .eq("id", id)
+      .eq("workspace_id", ctx.workspaceId);
+    throw new Error(result.message);
+  }
+
+  const { data, error } = await ctx.supabase
+    .from("comments_inbox")
+    .update({ reply_draft: text, status: "replied" })
+    .eq("id", id)
+    .eq("workspace_id", ctx.workspaceId)
+    .select("*")
+    .single();
+  if (error || !data) throw error ?? new Error("Failed to mark replied.");
+  return { row: data as InboxRow, status: result.status, message: result.message };
 }
 
 export async function markIgnored(id: string): Promise<InboxRow> {

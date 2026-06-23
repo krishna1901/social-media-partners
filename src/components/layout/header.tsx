@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { CommandBar } from "@/components/ui/command-bar";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useToast } from "@/components/ui/toast";
 import { notifications as demoNotifications } from "@/lib/demo-data";
 import { cn } from "@/lib/utils";
@@ -113,6 +114,8 @@ export function Header({ onMenuClick, live }: { onMenuClick?: () => void; live?:
             </>
           )}
         </div>
+
+        <ThemeToggle />
 
         {/* Notifications */}
         <div className="relative">

@@ -36,7 +36,14 @@ export async function isMetaConfigured(): Promise<boolean> {
   return Boolean(id && secret);
 }
 
+/**
+ * Redirect URI for the OAuth callback. Honors an explicit `META_REDIRECT_URI`
+ * override (must match the value registered in the Meta app); otherwise it's
+ * derived from the app URL.
+ */
 export function metaRedirectUri(): string {
+  const override = process.env.META_REDIRECT_URI?.trim();
+  if (override) return override;
   const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   return `${base.replace(/\/$/, "")}/api/oauth/meta/callback`;
 }
@@ -113,6 +120,23 @@ export async function listManagedPages(userToken: string): Promise<MetaPage[]> {
   }));
 }
 
+/**
+ * The permissions the user actually granted during consent. Authoritative source
+ * for "is publishing allowed?" — a user can decline individual scopes. Returns
+ * only the granted permission names.
+ */
+export async function listGrantedPermissions(userToken: string): Promise<string[]> {
+  const params = new URLSearchParams({ access_token: userToken });
+  const res = await fetch(`${GRAPH}/me/permissions?${params.toString()}`);
+  if (!res.ok) throw new Error(`Meta permissions fetch failed (${res.status}): ${await res.text()}`);
+  const data = (await res.json()) as {
+    data?: { permission: string; status: string }[];
+  };
+  return (data.data ?? [])
+    .filter((p) => p.status === "granted")
+    .map((p) => p.permission);
+}
+
 export interface MetaPublishResult {
   id: string;
   url: string | null;
@@ -166,4 +190,29 @@ export async function publishToInstagram(
   }
   const data = (await pubRes.json()) as { id: string };
   return { id: data.id, url: null };
+}
+
+/**
+ * Post a public reply to a Facebook or Instagram comment using the Page token.
+ * Facebook nests replies under `/{comment-id}/comments`; Instagram uses
+ * `/{ig-comment-id}/replies`. Returns the new reply's id.
+ *
+ * Powers comment-auto-reply automations. Requires the Page token (Facebook:
+ * `pages_manage_engagement`; Instagram: `instagram_manage_comments`).
+ */
+export async function replyToComment(
+  commentId: string,
+  pageToken: string,
+  message: string,
+  platform: "facebook" | "instagram"
+): Promise<{ id: string }> {
+  const edge = platform === "instagram" ? "replies" : "comments";
+  const res = await fetch(`${GRAPH}/${commentId}/${edge}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ message, access_token: pageToken }),
+  });
+  if (!res.ok) throw new Error(`Meta comment reply failed (${res.status}): ${await res.text()}`);
+  const data = (await res.json()) as { id: string };
+  return { id: data.id };
 }

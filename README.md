@@ -250,6 +250,87 @@ keys, `CRON_SECRET`, `TOKEN_ENCRYPTION_KEY`, Stripe + per-platform OAuth creds,
 and `NEXT_PUBLIC_APP_URL`. To force a demo deployment, set
 `NEXT_PUBLIC_DEMO_MODE=true`.
 
+## Production launch & health checks
+Before going live, use the admin-only **`/admin/health`** page (super-admin only,
+under the protected `/admin` shell). It shows presence/reachability status for
+every dependency, on-demand **safe connection tests**, and an auto-derived
+**launch checklist** — all **without ever revealing a secret value** (it reports
+only configured/missing/healthy/error and where a value resolved from). The
+checks below mirror what that page validates.
+
+### 1. Vercel environment variables (server-only secrets)
+Set these in **Vercel → Project → Settings → Environment Variables** (never
+prefix server-only values with `NEXT_PUBLIC_`):
+- `SUPABASE_SERVICE_ROLE_KEY` — cron runners, Stripe webhook, admin reads.
+- `TOKEN_ENCRYPTION_KEY` — min 16 chars; encrypts OAuth tokens + stored secrets. Keep it **stable** (rotating invalidates stored tokens/secrets).
+- `CRON_SECRET` — protects `/api/cron/*`.
+- `NEXT_PUBLIC_APP_URL` — the public https origin (e.g. `https://socialflowapp.com`); used to build OAuth + Stripe return URLs.
+- AI / Stripe / per-platform OAuth keys — **optional** here; prefer storing them in `/admin/secrets` (see below). Env is the fallback.
+
+### 2. Supabase environment (connection)
+The `social` project URL + anon key are **baked in**, so no env is required to
+connect. Override only to target a different project:
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (publishable/anon — safe in the browser).
+- `NEXT_PUBLIC_DEMO_MODE=true` forces demo mode (no auth, sample data) for previews/forks.
+
+### 3. Admin secrets setup (`/admin/secrets`)
+Centralized, encrypted key store — **end-users never enter keys**. A value saved
+here **overrides** the matching env var. Requires `SUPABASE_SERVICE_ROLE_KEY`
+(backend) and `TOKEN_ENCRYPTION_KEY` (to store secret values). Add: AI keys
+(`OPENAI_API_KEY` / `ANTHROPIC_API_KEY`), Stripe (`STRIPE_SECRET_KEY`,
+`STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_AGENCY`), per-platform
+OAuth creds, and the platform webhook URL/secret.
+
+### 4. Storage buckets
+Created idempotently by `supabase/schema.sql`: `media`, `thumbnails`,
+`carousels`, `videos` (public read) and `zips` (authenticated read). No manual
+step — verify with the **"Supabase Storage"** test on `/admin/health` (lists
+buckets + writes/deletes a tiny temp file).
+
+### 5. Domain setup
+Point **`socialflowapp.com`** at Vercel (Vercel → Settings → Domains) and set
+`NEXT_PUBLIC_APP_URL=https://socialflowapp.com`. Every OAuth/Stripe redirect URL
+is derived from this origin, so it must match the deployed domain exactly.
+
+### 6. OAuth redirect URLs
+Register **`<NEXT_PUBLIC_APP_URL>/api/oauth/<provider>/callback`** in each
+provider's developer dashboard, for the platforms you enable:
+- LinkedIn → `…/api/oauth/linkedin/callback`
+- Meta (Facebook + Instagram) → `…/api/oauth/meta/callback`
+- Google/YouTube → `…/api/oauth/youtube/callback`
+- TikTok → `…/api/oauth/tiktok/callback`
+- X → `…/api/oauth/x/callback`
+
+The **"OAuth redirect URLs"** test prints the exact URLs to register.
+
+### 7. Stripe webhook
+In the Stripe Dashboard add a webhook endpoint to
+**`<NEXT_PUBLIC_APP_URL>/api/stripe/webhook`**, copy its signing secret into
+`STRIPE_WEBHOOK_SECRET` (env or `/admin/secrets`). Locally:
+`stripe listen --forward-to localhost:3000/api/stripe/webhook`. Without it the
+webhook responds `200/skipped` and billing stays in demo mode.
+
+### 8. Cron
+`vercel.json` registers two daily crons (Hobby limit): `/api/cron/publish` and
+`/api/cron/maintenance`. Set `CRON_SECRET` and Vercel Cron sends it as
+`Authorization: Bearer <secret>` automatically. For a tighter cadence use Vercel
+Pro or an external scheduler hitting the same endpoints with the secret.
+
+### Final launch checklist
+- [ ] Vercel env vars set (service role, `TOKEN_ENCRYPTION_KEY`, `CRON_SECRET`, `NEXT_PUBLIC_APP_URL`).
+- [ ] `supabase/schema.sql` applied to the production project.
+- [ ] Storage buckets present (verified by the Storage test).
+- [ ] Admin secrets added in `/admin/secrets` (AI, Stripe, OAuth).
+- [ ] `socialflowapp.com` domain configured and `NEXT_PUBLIC_APP_URL` matches.
+- [ ] Stripe webhook configured + `STRIPE_WEBHOOK_SECRET` set.
+- [ ] OAuth redirect URLs registered for each enabled platform.
+- [ ] Cron configured (`CRON_SECRET` set).
+- [ ] `/admin/health` shows **0 errors** and the checklist is green.
+
+> All checks degrade safely: with no secrets the app still builds, lints, and
+> previews in demo mode. `/admin/health` and its tests are **super-admin only**
+> and never display secret values.
+
 ## Status
 The MVP is feature-complete: OAuth + encrypted tokens, the publishing runner with
 real publishers for every platform (LinkedIn, Meta, X, TikTok, YouTube), analytics

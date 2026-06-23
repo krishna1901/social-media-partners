@@ -10,6 +10,7 @@ import {
   type CreateAutomationInput,
 } from "@/lib/db/automations";
 import { runCurrentWorkspaceAutomations } from "@/lib/automations/runner";
+import { runCurrentWorkspaceEngine, dryRunRule } from "@/lib/automations/engine";
 
 type ActionResult<T = Record<string, never>> =
   | ({ ok: true } & T)
@@ -90,24 +91,54 @@ export async function deleteAutomation(
 }
 
 /**
- * Run the active automations for the current workspace against new inbox items
- * now (the same engine the inbox cron runs). Demo-safe.
+ * Run all active automations for the current workspace now: the legacy inbox
+ * auto-reply runner AND the general engine. Safe in demo mode (no-op). Returns a
+ * single human-readable summary for the UI.
  */
-export async function runAutomationsAction(): Promise<
-  | { ok: true; matched: number; drafted: number; autoHandled: number; automations: number; message?: string }
-  | { ok: false; error: string }
-> {
+export async function runAutomationsAction(): Promise<ActionResult<{ message: string }>> {
   try {
-    const s = await runCurrentWorkspaceAutomations();
+    const inbox = await runCurrentWorkspaceAutomations();
+    const engine = await runCurrentWorkspaceEngine();
     revalidatePath("/automations");
     revalidatePath("/inbox");
+
+    if (engine.mode === "demo" && inbox.mode === "demo") {
+      return { ok: true, message: engine.message ?? "Demo mode — nothing to run." };
+    }
+
+    const parts: string[] = [];
+    if (inbox.matched > 0) {
+      parts.push(
+        `${inbox.matched} inbox item${inbox.matched === 1 ? "" : "s"} processed (${inbox.autoHandled} handled, ${inbox.drafted} drafted)`
+      );
+    }
+    if (engine.rulesEvaluated > 0) {
+      parts.push(`${engine.rulesEvaluated} rule${engine.rulesEvaluated === 1 ? "" : "s"} evaluated`);
+    }
+    if (engine.actionsTaken > 0) parts.push(`${engine.actionsTaken} action(s) taken`);
+    if (engine.pending > 0) parts.push(`${engine.pending} awaiting approval`);
+    if (engine.failed > 0) parts.push(`${engine.failed} failed`);
+
+    const message = parts.length
+      ? parts.join(" · ")
+      : "No new items matched your active automations.";
+    return { ok: true, message };
+  } catch (err) {
+    return { ok: false, error: errorMessage(err) };
+  }
+}
+
+/** Dry-run (test) a single rule without performing its action. */
+export async function dryRunRuleAction(
+  id: string
+): Promise<ActionResult<{ message: string }>> {
+  try {
+    const summary = await dryRunRule(id);
+    revalidatePath("/automations");
+    const outcome = summary.outcomes[0];
     return {
       ok: true,
-      matched: s.matched,
-      drafted: s.drafted,
-      autoHandled: s.autoHandled,
-      automations: s.automations,
-      message: s.message,
+      message: outcome?.actionTaken ?? summary.message ?? "Dry run complete — no matches.",
     };
   } catch (err) {
     return { ok: false, error: errorMessage(err) };

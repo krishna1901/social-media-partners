@@ -29,7 +29,7 @@ import { InboxThread } from "@/components/ui/inbox-thread";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast";
 import { platformMeta } from "@/lib/demo-data";
-import { markReplied, markIgnored, saveReplyDraft, syncInboxAction } from "@/app/actions/inbox";
+import { markReplied, markIgnored, saveReplyDraft, sendReply, syncInboxAction } from "@/app/actions/inbox";
 import type { listInbox } from "@/lib/db/inbox";
 
 type InboxViewProps = { threads: Awaited<ReturnType<typeof listInbox>> };
@@ -127,6 +127,20 @@ export function InboxView({ threads }: InboxViewProps) {
   const handleSaveDraft = () => {
     if (!selected || !reply.trim()) return;
     runAction(() => saveReplyDraft(selected.id, reply));
+  };
+
+  const handleSendReply = () => {
+    if (!selected || !reply.trim()) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await sendReply(selected.id, reply);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setReply("");
+      router.refresh();
+    });
   };
 
   const handleUseSuggestion = () => {
@@ -384,10 +398,19 @@ export function InboxView({ threads }: InboxViewProps) {
                     rows={1}
                   />
                   <Button
-                    variant="gradient"
+                    variant="outline"
                     className="h-11 shrink-0"
                     disabled={!reply.trim() || pending}
                     onClick={handleSaveDraft}
+                    title="Save as draft"
+                  >
+                    Draft
+                  </Button>
+                  <Button
+                    variant="gradient"
+                    className="h-11 shrink-0"
+                    disabled={!reply.trim() || pending}
+                    onClick={handleSendReply}
                   >
                     <Send className="h-4 w-4" /> Send
                   </Button>

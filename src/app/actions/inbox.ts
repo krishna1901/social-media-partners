@@ -7,6 +7,7 @@ import {
   saveReplyDraft as dbSaveReplyDraft,
   markReplied as dbMarkReplied,
   markIgnored as dbMarkIgnored,
+  sendReply as dbSendReply,
 } from "@/lib/db/inbox";
 import { syncCurrentWorkspaceInbox } from "@/lib/inbox/sync";
 import type { InboxRow } from "@/lib/db/types";
@@ -85,6 +86,21 @@ export async function markReplied(
     const row = await dbMarkReplied(id);
     revalidateInbox();
     return { ok: true, id: row.id };
+  } catch (err) {
+    return { ok: false, error: errorMessage(err) };
+  }
+}
+
+/** Post a reply to the platform (simulate-safe) and mark the item replied. */
+export async function sendReply(
+  id: string,
+  text: string
+): Promise<ActionResult<{ id: string; status: string; message: string }>> {
+  try {
+    if (!text.trim()) return { ok: false, error: "Reply can't be empty." };
+    const { row, status, message } = await dbSendReply(id, text.trim());
+    revalidateInbox();
+    return { ok: true, id: row.id, status, message };
   } catch (err) {
     return { ok: false, error: errorMessage(err) };
   }

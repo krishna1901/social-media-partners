@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Sparkles, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 const links = [
   { label: "Features", href: "/features" },
@@ -40,6 +41,7 @@ export function SiteHeader({ loggedIn }: { loggedIn: boolean }) {
         </nav>
 
         <div className="hidden items-center gap-2 md:flex">
+          <ThemeToggle />
           {loggedIn ? (
             <Link href="/dashboard">
               <Button variant="gradient" className="rounded-full">Go to dashboard</Button>

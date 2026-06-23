@@ -1,5 +1,6 @@
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { Sparkline } from "@/components/charts/sparkline";
+import { AnimatedCounter } from "@/components/motion/animated-counter";
 import { cn } from "@/lib/utils";
 
 interface StatCardProps {
@@ -44,7 +45,9 @@ export function StatCard({
 
       <div className="mt-3 flex items-end justify-between gap-2">
         <div className="flex items-baseline gap-2">
-          <span className="text-2xl font-bold tracking-tight tabular-nums text-foreground">{value}</span>
+          <span className="text-2xl font-bold tracking-tight tabular-nums text-foreground">
+            {typeof value === "number" ? <AnimatedCounter value={value} /> : value}
+          </span>
           {delta && (
             <span
               className={cn(

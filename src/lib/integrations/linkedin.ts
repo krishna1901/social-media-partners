@@ -30,8 +30,14 @@ export async function isLinkedInConfigured(): Promise<boolean> {
   return Boolean(id && secret);
 }
 
-/** Redirect URI for the OAuth callback (derived from the app URL). */
+/**
+ * Redirect URI for the OAuth callback. Honors an explicit `LINKEDIN_REDIRECT_URI`
+ * override (must match the value registered in the LinkedIn app); otherwise it's
+ * derived from the app URL.
+ */
 export function linkedinRedirectUri(): string {
+  const override = process.env.LINKEDIN_REDIRECT_URI?.trim();
+  if (override) return override;
   const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   return `${base.replace(/\/$/, "")}/api/oauth/linkedin/callback`;
 }

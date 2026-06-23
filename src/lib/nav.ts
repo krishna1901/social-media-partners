@@ -10,7 +10,7 @@ import {
   Inbox,
   Crosshair,
   Bot,
-  Plug,
+  Radio,
   Settings,
   CreditCard,
   type LucideIcon,
@@ -53,7 +53,7 @@ export const navGroups: NavGroup[] = [
   {
     label: "Configure",
     items: [
-      { title: "Integrations", href: "/integrations", icon: Plug },
+      { title: "Channels", href: "/integrations", icon: Radio },
       { title: "Plan & Billing", href: "/billing", icon: CreditCard },
       { title: "Settings", href: "/settings", icon: Settings },
     ],

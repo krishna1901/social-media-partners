@@ -4,16 +4,13 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   RefreshCw,
-  Sparkles,
-  Workflow,
-  Webhook,
-  Plug,
+  Radio,
   CheckCircle2,
   AlertTriangle,
   Clock,
   Search,
+  Plug,
   X as XIcon,
-  type LucideIcon,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -23,6 +20,7 @@ import { PlatformIcon } from "@/components/ui/platform-icon";
 import { Segmented } from "@/components/ui/segmented";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Stagger, StaggerItem } from "@/components/motion/stagger";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import { integrations, type Platform } from "@/lib/demo-data";
@@ -32,23 +30,12 @@ import { disconnectPlatformAction } from "@/app/actions/integrations";
 type Integration = (typeof integrations)[number];
 type Status = Integration["status"];
 
+/** Only the user's own social channels live in the front panel. AI providers,
+ *  automation engines, webhooks, payments and every other API/workflow setting
+ *  are managed by the platform team in the Admin backend. */
+const channels: Integration[] = integrations.filter((i) => i.category === "Social");
+
 const PLATFORM_IDS: Platform[] = ["instagram", "facebook", "linkedin", "youtube", "tiktok", "x"];
-
-const lucideById: Record<string, LucideIcon> = {
-  openai: Sparkles,
-  claude: Sparkles,
-  n8n: Workflow,
-  webhooks: Webhook,
-};
-
-const categories = ["Social", "AI", "Automation"] as const;
-type Category = (typeof categories)[number];
-
-const categoryMeta: Record<Category, { description: string }> = {
-  Social: { description: "Publish and sync engagement across your social channels." },
-  AI: { description: "Connect AI providers that power content generation." },
-  Automation: { description: "Wire SocialFlow into your workflows and external tools." },
-};
 
 const setupNotes: Record<Status, string> = {
   connected: "Connected & ready to publish",
@@ -77,6 +64,17 @@ const ERROR_MESSAGES: Record<string, string> = {
   user_cancelled_login: "Connection cancelled.",
 };
 
+/** Informational notices about a partial Instagram/Meta connection. */
+const IG_MESSAGES: Record<string, string> = {
+  not_professional:
+    "Facebook connected — but no Instagram professional account was found. Convert your Instagram to a Business or Creator account, link it to your Facebook Page, then reconnect to enable Instagram publishing.",
+  missing_publish_permission:
+    "Instagram connected, but the content-publishing permission wasn't granted. Publishing needs the instagram_content_publish permission (and Meta App Review in production). Reconnect and approve it to publish.",
+};
+
+/** Core social providers that use official OAuth (vs. scaffolded providers). */
+const CORE_SOCIAL = new Set(["linkedin", "facebook", "instagram"]);
+
 function isPlatform(id: string): id is Platform {
   return (PLATFORM_IDS as string[]).includes(id);
 }
@@ -101,31 +99,32 @@ function oauthStartFor(
   return { href, configured: configuredProviders.includes(platform) };
 }
 
-function IntegrationTile({ item }: { item: Integration }) {
-  const LucideIco = lucideById[item.id] ?? Plug;
+function ChannelTile({ item }: { item: Integration }) {
   return (
     <div
       className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-sm ring-1 ring-white/15 transition-transform duration-300 group-hover:scale-105 ${item.accent}`}
     >
-      {item.category === "Social" && isPlatform(item.id) ? (
+      {isPlatform(item.id) ? (
         <PlatformIcon platform={item.id} className="h-5 w-5 text-white" />
       ) : (
-        <LucideIco className="h-5 w-5" />
+        <Plug className="h-5 w-5" />
       )}
     </div>
   );
 }
 
-function IntegrationCard({
+function ChannelCard({
   item,
   live,
   configuredProviders,
+  permissions,
   onDisconnect,
   disconnecting,
 }: {
   item: Integration;
   live: boolean;
   configuredProviders: string[];
+  permissions: string[];
   onDisconnect: (platform: string) => void;
   disconnecting: boolean;
 }) {
@@ -134,11 +133,15 @@ function IntegrationCard({
   // Connectable in demo (showcase) or when the provider's OAuth is configured.
   const connectable = !live || Boolean(oauth?.configured);
   const supportsDisconnect = live && Boolean(oauth);
+  // A configured-on-server core social provider that the user hasn't connected.
+  const needsServerSetup = live && Boolean(oauth) && !oauth?.configured && CORE_SOCIAL.has(item.id);
+  const showPermissions = live && item.status === "connected" && permissions.length > 0;
+  const showInstagramNote = live && item.id === "instagram";
 
   return (
     <div className="group flex h-full flex-col rounded-2xl border border-border bg-card p-5 shadow-soft transition-all duration-300 hover:-translate-y-0.5 hover:shadow-elevated hover:ring-1 hover:ring-brand-200/70">
       <div className="flex items-start gap-3">
-        <IntegrationTile item={item} />
+        <ChannelTile item={item} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
             <h3 className="truncate text-sm font-semibold text-foreground">{item.name}</h3>
@@ -163,6 +166,39 @@ function IntegrationCard({
         </p>
       </div>
 
+      {showPermissions && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {permissions.slice(0, 4).map((p) => (
+            <span
+              key={p}
+              className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+              title={p}
+            >
+              {p}
+            </span>
+          ))}
+          {permissions.length > 4 && (
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+              +{permissions.length - 4} more
+            </span>
+          )}
+        </div>
+      )}
+
+      {showInstagramNote && (
+        <p className="mt-3 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-[11px] leading-snug text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+          Needs an Instagram professional account + Meta App Review to publish.
+        </p>
+      )}
+
+      {needsServerSetup && (
+        <p className="mt-3 flex items-start gap-1.5 rounded-lg bg-muted/60 px-2.5 py-1.5 text-[11px] leading-snug text-muted-foreground">
+          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+          Not configured on the server — the platform team must add this app&apos;s OAuth credentials in Admin.
+        </p>
+      )}
+
       <div className="mt-4 flex items-center">
         {item.status === "connected" ? (
           supportsDisconnect ? (
@@ -184,7 +220,7 @@ function IntegrationCard({
                 toast({
                   variant: "info",
                   title: `${item.name} is connected`,
-                  description: "Detailed management controls for this provider are coming soon.",
+                  description: "Detailed management controls for this channel are coming soon.",
                 })
               }
             >
@@ -208,6 +244,10 @@ function IntegrationCard({
           >
             <Plug className="h-3.5 w-3.5" /> Connect {item.name}
           </a>
+        ) : needsServerSetup ? (
+          <Button size="sm" variant="outline" className="w-full" disabled>
+            Setup required
+          </Button>
         ) : live ? (
           <Button size="sm" variant="outline" className="w-full" disabled>
             Coming soon
@@ -219,8 +259,8 @@ function IntegrationCard({
             onClick={() =>
               toast({
                 variant: "info",
-                title: "Preview mode",
-                description: `Sign in to connect ${item.name} to your workspace.`,
+                title: `Connect ${item.name}`,
+                description: "Sign in to your workspace to link this channel.",
               })
             }
           >
@@ -241,21 +281,33 @@ export function IntegrationsView({
   liveAccounts: MappedConnectedAccount[];
   configuredProviders: string[];
 }) {
-  const router = useRouter();
-  const toast = useToast();
   const [status, setStatus] = useState<StatusFilter>("all");
   const [dismissed, setDismissed] = useState(false);
   const [isDisconnecting, startDisconnect] = useTransition();
+  const router = useRouter();
+  const toast = useToast();
   const searchParams = useSearchParams();
+
+  function handleRefresh() {
+    router.refresh();
+    toast({ variant: "info", title: "Refreshing channels", description: "Pulling the latest connection status." });
+  }
 
   const connectedParam = searchParams.get("connected");
   const errorParam = searchParams.get("error");
+  const igParam = searchParams.get("ig");
 
-  // Overlay live connection state onto social integrations when authenticated.
+  // Granted permissions per platform, for the connected social cards.
+  const permsByPlatform = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const a of liveAccounts) map[a.platform] = a.permissions ?? [];
+    return map;
+  }, [liveAccounts]);
+
+  // Overlay live connection state onto channels when authenticated.
   const items: Integration[] = useMemo(() => {
-    if (!live) return integrations;
-    return integrations.map((i) => {
-      if (i.category !== "Social") return i;
+    if (!live) return channels;
+    return channels.map((i) => {
       const acct = liveAccounts.find((a) => a.platform === i.id);
       const liveStatus: Status = !acct
         ? "available"
@@ -279,7 +331,6 @@ export function IntegrationsView({
   const connected = items.filter((i) => i.status === "connected").length;
   const available = items.filter((i) => i.status === "available").length;
   const needsAttention = items.filter((i) => i.status === "error").length;
-  const aiProviders = items.filter((i) => i.category === "AI").length;
 
   const filtered = useMemo(
     () => (status === "all" ? items : items.filter((i) => i.status === status)),
@@ -296,7 +347,7 @@ export function IntegrationsView({
     {
       label: "Connected",
       value: connected,
-      delta: `${Math.round((connected / items.length) * 100)}%`,
+      delta: items.length ? `${Math.round((connected / items.length) * 100)}%` : undefined,
       positive: true,
       hint: "Active & syncing",
       icon: <CheckCircle2 className="h-4 w-4" />,
@@ -319,10 +370,10 @@ export function IntegrationsView({
       accent: "from-amber-500 to-orange-500",
     },
     {
-      label: "AI providers",
-      value: aiProviders,
-      hint: "Generation engines",
-      icon: <Sparkles className="h-4 w-4" />,
+      label: "Platforms",
+      value: channels.length,
+      hint: "Supported networks",
+      icon: <Radio className="h-4 w-4" />,
       accent: "from-violet-500 to-indigo-500",
     },
   ];
@@ -331,46 +382,23 @@ export function IntegrationsView({
     <div className="space-y-6">
       <PageHeader
         eyebrow="Connections"
-        title="Integrations"
-        description="Connect your social accounts, AI providers and automation tools."
-        icon={<Plug className="h-5 w-5" />}
+        title="Channels"
+        description="Connect your social accounts to publish, schedule and sync engagement."
+        icon={<Radio className="h-5 w-5" />}
         actions={
           <>
-            <span className="hidden items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 sm:inline-flex">
+            <span className="hidden items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300 sm:inline-flex">
               <CheckCircle2 className="h-3.5 w-3.5" /> {connected} live
             </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                router.refresh();
-                toast({
-                  variant: "success",
-                  title: "Status refreshed",
-                  description: "Re-checked your connected accounts.",
-                });
-              }}
-            >
+            <Button variant="ghost" size="sm" onClick={handleRefresh}>
               <RefreshCw className="h-4 w-4" /> Refresh status
-            </Button>
-            <Button
-              className="bg-gradient-to-r from-brand-500 to-coral-500 text-white shadow-sm shadow-brand-500/20 hover:opacity-95"
-              onClick={() =>
-                toast({
-                  variant: "info",
-                  title: "You're browsing the marketplace",
-                  description: "Every available integration is listed below — more are on the way.",
-                })
-              }
-            >
-              <Plug className="h-4 w-4" /> Browse marketplace
             </Button>
           </>
         }
       />
 
       {!dismissed && connectedParam && (
-        <div className="flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <div className="flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
           <span className="flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
             <span className="font-medium capitalize">{connectedParam.replace(",", " & ")}</span> connected successfully.
@@ -381,10 +409,21 @@ export function IntegrationsView({
         </div>
       )}
       {!dismissed && errorParam && (
-        <div className="flex items-start justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="flex items-start justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
           <span className="flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
             {ERROR_MESSAGES[errorParam] ?? "Something went wrong connecting that account."}
+          </span>
+          <button type="button" onClick={() => setDismissed(true)} aria-label="Dismiss">
+            <XIcon className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+      {!dismissed && igParam && IG_MESSAGES[igParam] && (
+        <div className="flex items-start justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+          <span className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            {IG_MESSAGES[igParam]}
           </span>
           <button type="button" onClick={() => setDismissed(true)} aria-label="Dismiss">
             <XIcon className="h-4 w-4" />
@@ -411,7 +450,7 @@ export function IntegrationsView({
         <p className="px-1 text-xs font-medium text-muted-foreground">
           Showing{" "}
           <span className="font-semibold text-foreground tabular-nums">{filtered.length}</span> of{" "}
-          {items.length} integrations
+          {items.length} channels
         </p>
         <Segmented
           options={statusFilters}
@@ -424,44 +463,40 @@ export function IntegrationsView({
       {filtered.length === 0 ? (
         <EmptyState
           icon={<Search className="h-6 w-6" />}
-          title="No integrations match this filter"
-          description="Nothing here right now. Switch back to all integrations to browse everything you can connect."
+          title="No channels match this filter"
+          description="Nothing here right now. Switch back to all channels to browse everything you can connect."
           action={
             <Button variant="outline" size="sm" onClick={() => setStatus("all")}>
-              <RefreshCw className="h-4 w-4" /> Show all integrations
+              <RefreshCw className="h-4 w-4" /> Show all channels
             </Button>
           }
         />
       ) : (
-        categories.map((category) => {
-          const list = filtered.filter((i) => i.category === category);
-          if (list.length === 0) return null;
-          return (
-            <section key={category} className="space-y-4">
-              <SectionHeader
-                title={category}
-                description={categoryMeta[category].description}
-                action={
-                  <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                    {list.length} {list.length === 1 ? "integration" : "integrations"}
-                  </span>
-                }
-              />
-              <div className="grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {list.map((item) => (
-                  <IntegrationCard
-                    key={item.id}
-                    item={item}
-                    live={live}
-                    configuredProviders={configuredProviders}
-                    onDisconnect={handleDisconnect}
-                    disconnecting={isDisconnecting}
-                  />
-                ))}
-              </div>
-            </section>
-          );
-        })
+        <section className="space-y-4">
+          <SectionHeader
+            title="Social channels"
+            description="Publish and sync engagement across your social networks."
+            action={
+              <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                {filtered.length} {filtered.length === 1 ? "channel" : "channels"}
+              </span>
+            }
+          />
+          <Stagger className="grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {filtered.map((item) => (
+              <StaggerItem key={item.id} className="h-full">
+                <ChannelCard
+                  item={item}
+                  live={live}
+                  configuredProviders={configuredProviders}
+                  permissions={permsByPlatform[item.id] ?? []}
+                  onDisconnect={handleDisconnect}
+                  disconnecting={isDisconnecting}
+                />
+              </StaggerItem>
+            ))}
+          </Stagger>
+        </section>
       )}
     </div>
   );

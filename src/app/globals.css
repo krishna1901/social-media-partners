@@ -270,6 +270,8 @@
 @media (prefers-reduced-motion: reduce) {
   .animate-rise,
   .animate-pop,
+  .animate-float,
+  .animate-gradient,
   .chart-bar {
     animation: none;
   }
@@ -291,4 +293,78 @@
 }
 @utility bg-gradient-brand {
   background-image: linear-gradient(135deg, var(--color-brand-500), var(--color-coral-500));
+}
+
+/* ------------------------------------------------------------------ */
+/*  Premium upgrade — elevation, glass, gradients, animated accents    */
+/* ------------------------------------------------------------------ */
+
+/* Largest, softest elevation — for floating panels, modals, popovers. */
+@utility shadow-floating {
+  box-shadow:
+    0 4px 8px oklch(0.21 0.03 264 / 0.06),
+    0 24px 56px oklch(0.21 0.03 264 / 0.14);
+}
+
+/* Frosted translucent surface (dark-mode aware via tokens). */
+@utility glass {
+  background-color: color-mix(in oklch, var(--card) 72%, transparent);
+  backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid color-mix(in oklch, var(--border) 80%, transparent);
+}
+
+/* Brand gradient clipped to text. */
+@utility text-gradient-brand {
+  background-image: linear-gradient(120deg, var(--color-brand-500), var(--color-coral-500));
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+/* Consistent gradient icon chip used across app + admin + marketing. */
+@utility icon-gradient {
+  background-image: linear-gradient(135deg, var(--color-brand-500), var(--color-coral-500));
+  color: #fff;
+  box-shadow: 0 1px 2px oklch(0.21 0.03 264 / 0.15);
+  --tw-ring-color: oklch(1 0 0 / 0.15);
+}
+
+/* Slow panning conic/linear gradient for hero CTAs and accents. */
+@keyframes gradient-pan {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient-pan 6s ease infinite;
+}
+
+/* Gentle floating drift for decorative orbs (CSS fallback for non-motion use). */
+@keyframes float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -16px, 0);
+  }
+}
+.animate-float {
+  animation: float 14s ease-in-out infinite;
+}
+
+/* Radial spotlight backdrop for premium hero/empty surfaces. */
+@utility bg-spotlight {
+  background-image: radial-gradient(
+    60% 60% at 50% 0%,
+    color-mix(in oklch, var(--color-brand-500) 18%, transparent),
+    transparent 70%
+  );
 }

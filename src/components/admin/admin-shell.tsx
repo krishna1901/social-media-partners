@@ -4,8 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, ArrowLeft, LogOut, ShieldCheck } from "lucide-react";
-import { adminNav } from "@/lib/admin/nav";
+import { adminNavGroups } from "@/lib/admin/nav";
 import { signOutAction } from "@/app/actions/auth";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { PageTransition } from "@/components/motion/page-transition";
 import { cn } from "@/lib/utils";
 
 function SidebarBody({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
@@ -23,26 +25,34 @@ function SidebarBody({ pathname, onNavigate }: { pathname: string; onNavigate?: 
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1 overflow-y-auto scrollbar-hide px-3 py-2">
-        {adminNav.map((item) => {
-          const active = pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href + "/"));
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onNavigate}
-              className={cn(
-                "flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
-                active
-                  ? "bg-gradient-to-r from-brand-500/25 to-coral-500/10 text-white ring-1 ring-inset ring-white/10"
-                  : "text-white/60 hover:bg-white/5 hover:text-white"
-              )}
-            >
-              <item.icon className={cn("h-[18px] w-[18px]", active ? "text-brand-400" : "text-white/50")} />
-              {item.title}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 space-y-6 overflow-y-auto scrollbar-hide px-3 py-2">
+        {adminNavGroups.map((group) => (
+          <div key={group.label} className="space-y-1">
+            <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-white/35">{group.label}</p>
+            {group.items.map((item) => {
+              const active = pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href + "/"));
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onNavigate}
+                  className={cn(
+                    "group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200",
+                    active
+                      ? "bg-gradient-to-r from-brand-500/25 to-coral-500/10 text-white shadow-sm shadow-brand-500/10 ring-1 ring-inset ring-white/10"
+                      : "text-white/60 hover:bg-white/5 hover:text-white"
+                  )}
+                >
+                  {active && (
+                    <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-brand-400 to-coral-500 shadow-[0_0_12px] shadow-brand-500/50" />
+                  )}
+                  <item.icon className={cn("h-[18px] w-[18px]", active ? "text-brand-400" : "text-white/50 group-hover:text-white/80")} />
+                  {item.title}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
       <div className="space-y-1 border-t border-white/10 p-3">
@@ -100,10 +110,13 @@ export function AdminShell({ email, children }: { email: string | null; children
               <ShieldCheck className="h-3.5 w-3.5" /> Master Admin
             </span>
           </div>
-          <p className="truncate text-sm text-muted-foreground">{email}</p>
+          <div className="flex items-center gap-2">
+            <p className="hidden truncate text-sm text-muted-foreground sm:block">{email}</p>
+            <ThemeToggle />
+          </div>
         </header>
         <main className="flex-1 overflow-y-auto scrollbar-thin">
-          <div className="mx-auto max-w-[1280px] animate-rise p-4 sm:p-6 lg:p-8">{children}</div>
+          <PageTransition className="mx-auto max-w-[1280px] p-4 sm:p-6 lg:p-8">{children}</PageTransition>
         </main>
       </div>
     </div>

@@ -22,6 +22,8 @@ export interface StoreTokenInput {
   refreshToken?: string | null;
   scope?: string | null;
   expiresAt?: string | null;
+  /** Granted permission/scope names to mirror into `platform_permissions`. */
+  permissions?: string[] | null;
 }
 
 export interface DecryptedToken {
@@ -113,7 +115,56 @@ export async function storeConnection(
     if (error) throw error;
   }
 
+  // 3. Mirror the granted permissions into `platform_permissions` (replace the
+  //    existing set so reconnecting with fewer scopes is reflected accurately).
+  if (input.permissions) {
+    await savePermissions(client, {
+      workspaceId: input.workspaceId,
+      connectedAccountId: accountId,
+      platform: input.platform,
+      permissions: input.permissions,
+    });
+  }
+
   return accountId;
+}
+
+/**
+ * Replace the granted permission rows for a connected account in
+ * `platform_permissions`. Best-effort: a failure here must not undo a successful
+ * connection, so errors are swallowed. Scope-only (never touches tokens).
+ */
+export async function savePermissions(
+  client: SupabaseClient,
+  input: {
+    workspaceId: string;
+    connectedAccountId: string;
+    platform: string;
+    permissions: string[];
+  }
+): Promise<void> {
+  // Normalize: trim, drop blanks, de-dupe.
+  const perms = Array.from(
+    new Set(input.permissions.map((p) => p.trim()).filter(Boolean))
+  );
+
+  await client
+    .from("platform_permissions")
+    .delete()
+    .eq("workspace_id", input.workspaceId)
+    .eq("connected_account_id", input.connectedAccountId);
+
+  if (perms.length === 0) return;
+
+  await client.from("platform_permissions").insert(
+    perms.map((permission) => ({
+      workspace_id: input.workspaceId,
+      connected_account_id: input.connectedAccountId,
+      platform: input.platform,
+      permission,
+      granted: true,
+    }))
+  );
 }
 
 /**

@@ -164,25 +164,63 @@ export interface InboxRow {
   related_post_id: string | null;
   suggested_reply: string | null;
   reply_draft: string | null;
+  /** Provider comment/DM id — used to post a reply back to the platform. */
+  external_id: string | null;
   received_at: string | null;
   created_at: string;
   updated_at: string;
 }
+
+/** General automation trigger types (Phase 6); legacy DM rows leave this null. */
+export type AutomationTriggerType =
+  | "inbox-keyword"
+  | "content-pool-queue"
+  | "recurring-post"
+  | "media-to-draft"
+  | "failed-publish-alert"
+  | "idea-ready-to-draft"
+  | "competitor-post-to-idea";
+
+/** Safe internal actions the engine can perform (no external send/publish). */
+export type AutomationActionType =
+  | "create-draft-post"
+  | "queue-scheduled-post"
+  | "inbox-suggested-reply"
+  | "create-content-idea"
+  | "write-log"
+  | "notify";
 
 export interface AutomationRow {
   id: string;
   workspace_id: string;
   created_by: string | null;
   name: string;
+  /** Legacy DM automation type (kept for back-compat with the inbox runner). */
   type: "dm-keyword" | "comment-reply" | "lead-capture";
   description: string | null;
   trigger: string | null;
+  /** Phase 6 — general engine fields (null/`{}` on legacy DM rows). */
+  trigger_type: AutomationTriggerType | null;
+  conditions: Record<string, unknown> | null;
+  action_type: AutomationActionType | null;
+  action_config: Record<string, unknown> | null;
   active: boolean;
   requires_approval: boolean;
   runs: number;
   last_run_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface AutomationLogRow {
+  id: string;
+  workspace_id: string;
+  rule_id: string | null;
+  run_id: string;
+  status: "success" | "skipped" | "pending" | "failed" | "dry_run";
+  action_taken: string | null;
+  error_message: string | null;
+  created_at: string;
 }
 
 export interface ScheduledPostRow {

@@ -11,11 +11,13 @@ export function SecretEditor({
   label,
   isSecret,
   status,
+  hint,
 }: {
   secretKey: string;
   label: string;
   isSecret: boolean;
   status: { setInDb: boolean; setInEnv: boolean };
+  hint?: string;
 }) {
   const router = useRouter();
   const [value, setValue] = useState("");
@@ -75,6 +77,7 @@ export function SecretEditor({
           <Button variant="ghost" disabled={pending} onClick={clear}>Clear</Button>
         )}
       </div>
+      {hint && <p className="mt-2 text-[11px] text-muted-foreground">{hint}</p>}
       {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
     </div>
   );

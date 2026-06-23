@@ -45,8 +45,10 @@ const statusMap: Record<string, { tone: Tone; label?: string }> = {
   peaking: { tone: "warning" },
   steady: { tone: "info" },
   // automation log
+  success: { tone: "success" },
   pending: { tone: "warning" },
   skipped: { tone: "neutral" },
+  dry_run: { tone: "info", label: "Dry run" },
 };
 
 export function StatusBadge({

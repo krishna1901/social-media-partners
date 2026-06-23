@@ -1,4 +1,5 @@
 import { Sparkles, Check } from "lucide-react";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 const highlights = [
   "AI content studio — hooks, captions, scripts & more",
@@ -51,7 +52,10 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       </div>
 
       {/* Form panel */}
-      <div className="flex items-center justify-center bg-background p-6">
+      <div className="relative flex items-center justify-center bg-background p-6">
+        <div className="absolute right-4 top-4">
+          <ThemeToggle />
+        </div>
         <div className="w-full max-w-sm">{children}</div>
       </div>
     </div>

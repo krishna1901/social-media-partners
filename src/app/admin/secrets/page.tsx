@@ -27,10 +27,11 @@ export default async function AdminSecretsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Platform keys</h1>
+        <h1 className="text-2xl font-bold tracking-tight">All platform keys</h1>
         <p className="text-sm text-muted-foreground">
-          Manage every API key in one place. End-users never enter keys — the platform provides them.
-          Values are encrypted at rest and shown masked. A value set here overrides the environment variable.
+          Every API key in one place — also organized into the AI, Social, Payments, Automation and Webhooks
+          sections. End-users never enter keys; the platform provides them. Values are encrypted at rest and
+          shown masked. A value set here overrides the environment variable.
         </p>
       </div>
 
@@ -50,6 +51,7 @@ export default async function AdminSecretsPage() {
                 secretKey={item.key}
                 label={item.label}
                 isSecret={item.isSecret ?? true}
+                hint={item.hint}
                 status={statuses[item.key] ?? { setInDb: false, setInEnv: false }}
               />
             ))}

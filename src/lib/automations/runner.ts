@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getDbContext, isLive } from "@/lib/db/context";
+import { sendPlatformReply } from "@/lib/automations/reply";
 import type { AutomationRow, InboxRow } from "@/lib/db/types";
 
 /**
@@ -76,7 +77,9 @@ export async function runWorkspaceAutomations(
     .from("dm_automations")
     .select("*")
     .eq("workspace_id", workspaceId)
-    .eq("active", true);
+    .eq("active", true)
+    // Legacy inbox rules only — general (trigger_type) rules run via the engine.
+    .is("trigger_type", null);
   const automations = (autoData as AutomationRow[] | null) ?? [];
   if (automations.length === 0) {
     return { automations: 0, matched: 0, drafted: 0, autoHandled: 0 };
@@ -120,12 +123,25 @@ export async function runWorkspaceAutomations(
 
       const reply = composeReply(automation, item);
       const autoSend = !automation.requires_approval;
+
+      // Auto-reply: actually post the reply to the platform (simulate-safe).
+      // On an honest send failure (PUBLISH_SIMULATE=false) leave the item
+      // completely untouched — not even a draft — so it stays eligible for the
+      // next run's `reply_draft IS NULL` scan and is retried once the
+      // integration is healthy again (it also remains replyable from the inbox).
+      let sent = false;
+      if (autoSend) {
+        const r = await sendPlatformReply(client, item, reply);
+        if (!r.ok) continue;
+        sent = true;
+      }
+
       const patch: Record<string, unknown> = {
         reply_draft: reply,
         suggested_reply: reply,
         updated_at: new Date().toISOString(),
       };
-      if (autoSend) patch.status = "replied";
+      if (sent) patch.status = "replied";
 
       const { error } = await client
         .from("comments_inbox")
@@ -137,7 +153,7 @@ export async function runWorkspaceAutomations(
       claimed.add(item.id);
       matched++;
       actionedForThis++;
-      if (autoSend) autoHandled++;
+      if (sent) autoHandled++;
       else drafted++;
     }
 
@@ -194,7 +210,8 @@ export async function runAllWorkspacesAutomations(): Promise<AutomationRunSummar
   const { data } = await admin
     .from("dm_automations")
     .select("workspace_id")
-    .eq("active", true);
+    .eq("active", true)
+    .is("trigger_type", null);
   const workspaces = [
     ...new Set(((data as { workspace_id: string }[] | null) ?? []).map((r) => r.workspace_id)),
   ];

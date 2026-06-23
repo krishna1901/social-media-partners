@@ -23,6 +23,7 @@ import { BarChart } from "@/components/charts/bar-chart";
 import { DonutChart } from "@/components/charts/donut-chart";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Stagger, StaggerItem } from "@/components/motion/stagger";
 import {
   currentUser,
   dashboardStats,
@@ -158,18 +159,19 @@ function LiveDashboard({
       </section>
 
       {/* Stat cards (real) */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+      <Stagger className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
         {liveStats.map((s) => (
-          <StatCard
-            key={s.key}
-            label={s.label}
-            value={typeof s.value === "number" ? s.value.toLocaleString() : s.value}
-            hint={s.hint}
-            icon={statMeta[s.key]?.icon}
-            accent={statMeta[s.key]?.accent}
-          />
+          <StaggerItem key={s.key}>
+            <StatCard
+              label={s.label}
+              value={s.value}
+              hint={s.hint}
+              icon={statMeta[s.key]?.icon}
+              accent={statMeta[s.key]?.accent}
+            />
+          </StaggerItem>
         ))}
-      </div>
+      </Stagger>
 
       {/* Get started + recent AI */}
       <div className="grid gap-4 lg:grid-cols-3">
@@ -256,10 +258,10 @@ function DemoDashboard({
   inboxCount: number;
 }) {
   const statValues: Record<string, string | number> = {
-    "total-posts": counts.total.toLocaleString(),
-    drafts: counts.drafts.toLocaleString(),
-    scheduled: counts.scheduled.toLocaleString(),
-    inbox: inboxCount.toLocaleString(),
+    "total-posts": counts.total,
+    drafts: counts.drafts,
+    scheduled: counts.scheduled,
+    inbox: inboxCount,
   };
 
   return (
@@ -312,20 +314,21 @@ function DemoDashboard({
       </section>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+      <Stagger className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
         {dashboardStats.map((s) => (
-          <StatCard
-            key={s.key}
-            label={s.label}
-            value={statValues[s.key] ?? s.value}
-            delta={s.delta}
-            positive={s.positive}
-            hint={s.hint}
-            icon={statMeta[s.key]?.icon}
-            accent={statMeta[s.key]?.accent}
-          />
+          <StaggerItem key={s.key}>
+            <StatCard
+              label={s.label}
+              value={statValues[s.key] ?? s.value}
+              delta={s.delta}
+              positive={s.positive}
+              hint={s.hint}
+              icon={statMeta[s.key]?.icon}
+              accent={statMeta[s.key]?.accent}
+            />
+          </StaggerItem>
         ))}
-      </div>
+      </Stagger>
 
       {/* Performance + platform breakdown */}
       <div className="grid gap-4 lg:grid-cols-3">

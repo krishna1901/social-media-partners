@@ -4,6 +4,7 @@ import {
   exchangeCode,
   exchangeForLongLived,
   listManagedPages,
+  listGrantedPermissions,
 } from "@/lib/integrations/meta";
 import { storeConnection } from "@/lib/db/social-tokens";
 
@@ -58,7 +59,20 @@ export async function GET(request: NextRequest) {
 
     const pages = await listManagedPages(userToken);
     if (pages.length === 0) return fail("no_facebook_page");
-    const page = pages[0];
+
+    // The permissions the user actually granted (a user can decline scopes).
+    let granted: string[] = [];
+    try {
+      granted = await listGrantedPermissions(userToken);
+    } catch {
+      /* non-fatal — proceed without an authoritative permission list */
+    }
+    const canPublishInstagram = granted.includes("instagram_content_publish");
+
+    // Prefer a Page that has a linked Instagram professional account so the
+    // Facebook + Instagram connections share the same Page token.
+    const igPage = pages.find((p) => p.instagramId);
+    const page = igPage ?? pages[0];
 
     const expiresAt = expiresIn
       ? new Date(Date.now() + expiresIn * 1000).toISOString()
@@ -75,25 +89,38 @@ export async function GET(request: NextRequest) {
       accessToken: page.accessToken,
       scope: "pages_manage_posts",
       expiresAt,
+      permissions: granted.length ? granted : null,
     });
 
-    // Instagram connection (same Page token, IG Business id) when linked.
-    if (page.instagramId) {
-      await storeConnection(ctx.supabase, {
-        workspaceId: ctx.workspaceId,
-        userId: ctx.userId,
-        platform: "instagram",
-        accountName: page.instagramUsername ?? page.name,
-        accountHandle: page.instagramUsername,
-        externalId: page.instagramId,
-        accessToken: page.accessToken,
-        scope: "instagram_content_publish",
-        expiresAt,
-      });
+    // No Instagram professional/business account linked to any Page.
+    if (!igPage) {
+      const res = NextResponse.redirect(
+        `${appUrl()}/integrations?connected=facebook&ig=not_professional`
+      );
+      res.cookies.set("meta_oauth_state", "", { maxAge: 0, path: "/" });
+      return res;
     }
 
-    const connected = page.instagramId ? "facebook%2Cinstagram" : "facebook";
-    const res = NextResponse.redirect(`${appUrl()}/integrations?connected=${connected}`);
+    // Instagram connection (same Page token, IG Business id). Stored even when
+    // the publish permission wasn't granted so the account shows as connected;
+    // the UI surfaces that publishing needs the permission + App Review.
+    await storeConnection(ctx.supabase, {
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      platform: "instagram",
+      accountName: igPage.instagramUsername ?? igPage.name,
+      accountHandle: igPage.instagramUsername,
+      externalId: igPage.instagramId,
+      accessToken: igPage.accessToken,
+      scope: "instagram_content_publish",
+      expiresAt,
+      permissions: granted.length ? granted : null,
+    });
+
+    const igSignal = canPublishInstagram ? "" : "&ig=missing_publish_permission";
+    const res = NextResponse.redirect(
+      `${appUrl()}/integrations?connected=facebook%2Cinstagram${igSignal}`
+    );
     res.cookies.set("meta_oauth_state", "", { maxAge: 0, path: "/" });
     return res;
   } catch {

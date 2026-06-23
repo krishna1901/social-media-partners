@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
+import { PageTransition } from "@/components/motion/page-transition";
 import { ToastProvider } from "@/components/ui/toast";
 import { stopImpersonationAction } from "@/app/actions/admin";
 import type { SessionView } from "@/lib/db/session";
@@ -18,7 +18,6 @@ export function AppShell({
   impersonating?: boolean;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const pathname = usePathname();
 
   return (
     <ToastProvider>
@@ -53,9 +52,9 @@ export function AppShell({
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <Header onMenuClick={() => setMobileOpen(true)} live={session.live} />
           <main className="flex-1 overflow-y-auto scrollbar-thin">
-            <div key={pathname} className="mx-auto max-w-[1440px] animate-rise p-4 sm:p-6 lg:p-8">
+            <PageTransition className="mx-auto max-w-[1440px] p-4 sm:p-6 lg:p-8">
               {children}
-            </div>
+            </PageTransition>
           </main>
         </div>
       </div>
