@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 export const metadata: Metadata = {
   title: "About",
   description: "SocialFlow AI is building the AI content command center for creators, marketers, and agencies.",
+  alternates: { canonical: "/about" },
 };
 
 const values = [

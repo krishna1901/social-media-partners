@@ -52,10 +52,3 @@ export function decryptSecret(payload: string): string {
   ]);
   return dec.toString("utf8");
 }
-
-/** Constant-time-ish HMAC signature for OAuth `state` (CSRF) using the same key. */
-export function signState(value: string): string {
-  const key = deriveKey();
-  const secret = key ?? Buffer.from("socialflow-default-state-secret");
-  return createHash("sha256").update(`${value}.${secret.toString("hex")}`).digest("hex").slice(0, 32);
-}

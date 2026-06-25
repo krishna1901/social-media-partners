@@ -47,11 +47,24 @@ export function isLive(ctx: DbContext): ctx is LiveDbContext {
   return Boolean(ctx.configured && ctx.supabase && ctx.userId && ctx.workspaceId);
 }
 
-/** Convenience for server actions that must be authenticated. Throws otherwise. */
+/**
+ * Convenience for server actions that must be authenticated. Throws otherwise.
+ * Also rejects suspended accounts so suspension is enforced for every server
+ * action / API route (not just the (app) layout redirect, which doesn't run for
+ * server actions or route handlers).
+ */
 export async function requireLiveContext(): Promise<LiveDbContext> {
   const ctx = await getDbContext();
   if (!isLive(ctx)) {
     throw new Error("Not authenticated or Supabase is not configured.");
+  }
+  const { data: profile } = await ctx.supabase
+    .from("profiles")
+    .select("status")
+    .eq("id", ctx.userId)
+    .maybeSingle();
+  if (profile?.status === "suspended") {
+    throw new Error("Account suspended.");
   }
   return ctx;
 }

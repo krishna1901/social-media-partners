@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { PricingCards } from "@/components/marketing/pricing-cards";
+import { SoftwareApplicationJsonLd } from "@/components/seo/json-ld";
 
 export const metadata: Metadata = {
   title: "Pricing",
   description:
     "Simple, transparent pricing for SocialFlow AI. Start free, upgrade to Pro or Agency as you grow.",
+  alternates: { canonical: "/pricing" },
 };
 
 const faqs = [
@@ -39,6 +41,7 @@ const included = [
 export default function PricingPage() {
   return (
     <>
+      <SoftwareApplicationJsonLd />
       <section className="relative overflow-hidden">
         <div className="bg-grid absolute inset-0 opacity-50" />
         <div className="relative mx-auto max-w-3xl px-4 py-16 text-center sm:px-6 sm:py-20">

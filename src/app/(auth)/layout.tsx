@@ -1,5 +1,10 @@
+import type { Metadata } from "next";
 import { Sparkles, Check } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 const highlights = [
   "AI content studio — hooks, captions, scripts & more",

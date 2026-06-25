@@ -37,7 +37,11 @@ export async function GET(request: NextRequest) {
 
   const ctx = await getDbContext();
   if (!isLive(ctx)) {
-    return NextResponse.redirect(`${appUrl()}/login?redirectedFrom=/integrations`);
+    // Clear the consumed state cookie even here so the code+state can't be
+    // replayed within its maxAge after re-auth.
+    const res = NextResponse.redirect(`${appUrl()}/login?redirectedFrom=/integrations`);
+    res.cookies.set("li_oauth_state", "", { maxAge: 0, path: "/" });
+    return res;
   }
 
   try {

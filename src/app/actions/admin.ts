@@ -142,18 +142,26 @@ export async function impersonateUserAction(userId: string): Promise<AdminAction
 export async function stopImpersonationAction(): Promise<void> {
   const jar = await cookies();
   const enc = jar.get(IMP_ADMIN_COOKIE)?.value;
-  if (enc) {
-    try {
-      const tokens = JSON.parse(decryptSecret(enc)) as { access_token: string; refresh_token: string };
-      const userClient = await createClient();
-      await userClient.auth.setSession({ access_token: tokens.access_token, refresh_token: tokens.refresh_token });
-    } catch {
-      // fall through — markers are cleared regardless
-    }
+  // No impersonation in progress for this caller: nothing to restore. Clear any
+  // stray marker and return without swapping the session or routing into admin.
+  if (!enc) {
+    jar.delete(IMP_ACTIVE_COOKIE);
+    return;
+  }
+  let restored = false;
+  try {
+    const tokens = JSON.parse(decryptSecret(enc)) as { access_token: string; refresh_token: string };
+    const userClient = await createClient();
+    await userClient.auth.setSession({ access_token: tokens.access_token, refresh_token: tokens.refresh_token });
+    restored = true;
+  } catch {
+    // fall through — markers are cleared regardless
   }
   jar.delete(IMP_ADMIN_COOKIE);
   jar.delete(IMP_ACTIVE_COOKIE);
-  redirect("/admin/users");
+  // redirect() throws to navigate, so keep it outside the try/catch. Only route
+  // into the admin area after a successful restore (it gates on requireSuperAdmin).
+  if (restored) redirect("/admin/users");
 }
 
 export async function setPlatformSecretAction(key: string, value: string): Promise<AdminActionResult> {

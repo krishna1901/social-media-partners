@@ -2,7 +2,10 @@ import { ShieldAlert } from "lucide-react";
 import { signOutAction } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 
-export const metadata = { title: "Account suspended · SocialFlow AI" };
+export const metadata = {
+  title: "Account suspended · SocialFlow AI",
+  robots: { index: false, follow: false },
+};
 
 export default function SuspendedPage() {
   return (

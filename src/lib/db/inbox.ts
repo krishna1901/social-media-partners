@@ -61,7 +61,11 @@ export async function listInbox(): Promise<MappedInboxThread[]> {
     .from("comments_inbox")
     .select("*")
     .eq("workspace_id", ctx.workspaceId)
-    .order("received_at", { ascending: false });
+    // nullsFirst:false keeps real received timestamps dominating the sort and
+    // pushes NULL-dated rows to the bottom (they fall back to created_at in the
+    // display), instead of Postgres' default of NULLs-first on DESC.
+    .order("received_at", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false });
 
   if (error || !data) return [];
   return (data as InboxRow[]).map(mapInbox);

@@ -210,6 +210,14 @@ export function AutomationsView({
   const setToggle = (id: string, key: "active" | "requiresApproval", value: boolean) =>
     setToggles((prev) => ({ ...prev, [id]: { ...prev[id], [key]: value } }));
 
+  // Read effective state from the live `automations` prop with any in-flight
+  // local override applied. Seeding `toggles` once on mount goes stale after
+  // router.refresh() delivers a new prop (deleted rows would still count, new
+  // rows would be missing/undefined); deriving on read keeps counts + the
+  // Active/Inactive filter correct without clobbering optimistic toggles.
+  const stateOf = (a: { id: string; active: boolean; requiresApproval: boolean }) =>
+    toggles[a.id] ?? { active: a.active, requiresApproval: a.requiresApproval };
+
   const handleRunNow = () => {
     setError(null);
     setRunNote(null);
@@ -383,7 +391,7 @@ export function AutomationsView({
 
   /* ------------------------------- derived state ----------------------------- */
 
-  const activeCount = Object.values(toggles).filter((t) => t.active).length;
+  const activeCount = automations.filter((a) => stateOf(a).active).length;
   const inactiveCount = automations.length - activeCount;
 
   const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
@@ -394,8 +402,8 @@ export function AutomationsView({
   ];
 
   const visibleAutomations = automations.filter((a) => {
-    if (filter === "active") return toggles[a.id]?.active;
-    if (filter === "inactive") return !toggles[a.id]?.active;
+    if (filter === "active") return stateOf(a).active;
+    if (filter === "inactive") return !stateOf(a).active;
     return true;
   });
 
@@ -525,7 +533,7 @@ export function AutomationsView({
           <div className="grid items-stretch gap-4 lg:grid-cols-2">
             {visibleAutomations.map((a) => {
               const m = cardMeta(a);
-              const state = toggles[a.id] ?? { active: a.active, requiresApproval: a.requiresApproval };
+              const state = stateOf(a);
               const action = a.actionType ? ACTION_LABEL[a.actionType] : "Suggested reply";
               return (
                 <div

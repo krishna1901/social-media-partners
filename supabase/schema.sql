@@ -858,5 +858,99 @@ create policy "automation_logs_member_all" on public.automation_logs
   with check (public.is_workspace_member(workspace_id));
 
 -- ============================================================================
+-- Phase 8 — security hardening. Additive + idempotent (safe to re-run).
+-- ============================================================================
+
+-- #1 (CRITICAL) — Block self-mutation of privileged profile columns.
+-- profiles_update_own lets a user update their own row, and role/status live on
+-- profiles, so without a guard ANY authenticated user could run (via the public
+-- anon key) `update profiles set role='super_admin' where id=<self>` to seize the
+-- admin surface, or `set status='active'` to un-suspend themselves. This BEFORE
+-- UPDATE trigger rejects role/status changes from a user session; service-role
+-- admin writes have auth.uid() = null and pass through. A column-level REVOKE
+-- adds defense-in-depth (service-role bypasses RLS + column grants).
+create or replace function public.profiles_guard_privileged_cols()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is not null
+     and (new.role is distinct from old.role
+          or new.status is distinct from old.status) then
+    raise exception 'role/status may only be changed by an administrator'
+      using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists profiles_guard_privileged on public.profiles;
+create trigger profiles_guard_privileged
+  before update on public.profiles
+  for each row execute function public.profiles_guard_privileged_cols();
+revoke update (role, status) on public.profiles from anon, authenticated;
+
+-- #2 — Exactly one bootstrap workspace per owner. Collapses concurrent
+-- first-login bootstraps onto a single workspace (ensureUserBootstrapped relies
+-- on this unique violation to re-read the winner instead of creating duplicates).
+-- Created conditionally so it never fails / deletes data when legacy duplicate
+-- owners exist (de-duplicate those first, then re-run).
+do $$
+begin
+  if not exists (
+    select 1 from public.workspaces where owner_id is not null
+    group by owner_id having count(*) > 1
+  ) then
+    create unique index if not exists uq_workspaces_owner
+      on public.workspaces (owner_id) where owner_id is not null;
+  else
+    raise notice 'uq_workspaces_owner skipped: duplicate owner_id rows exist; de-duplicate first.';
+  end if;
+end $$;
+
+-- #3 — Suspended-user RLS backstop. Membership-only policies do not consider
+-- account status, so a suspended user keeps full data access at the DB layer
+-- (the (app) layout redirect does not run for server actions / route handlers).
+-- requireLiveContext() already rejects suspended sessions in code; this is the
+-- durable backstop. Re-generates the workspace-scoped *_member_all policies to
+-- also require an active profile.
+create or replace function public.is_active_user()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and status = 'active'
+  );
+$$;
+revoke execute on function public.is_active_user() from anon;
+
+do $$
+declare
+  t text;
+  tables text[] := array[
+    'posts','post_channels','media_assets','scheduled_posts','publishing_jobs',
+    'publishing_logs','connected_accounts','social_tokens','platform_permissions',
+    'trends','content_ideas','ai_generations','analytics_snapshots',
+    'comments_inbox','dm_automations','competitors','competitor_posts','settings',
+    'automation_logs'
+  ];
+begin
+  foreach t in array tables loop
+    execute format('drop policy if exists "%s_member_all" on public.%I;', t, t);
+    execute format(
+      'create policy "%s_member_all" on public.%I
+         for all
+         using (public.is_active_user() and public.is_workspace_member(workspace_id))
+         with check (public.is_active_user() and public.is_workspace_member(workspace_id));', t, t);
+  end loop;
+end;
+$$;
+
+-- ============================================================================
 -- End of schema.
 -- ============================================================================

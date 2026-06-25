@@ -43,13 +43,21 @@ export async function GET(
 
   const ctx = await getDbContext();
   if (!isLive(ctx)) {
-    return NextResponse.redirect(`${appUrl()}/login?redirectedFrom=/integrations`);
+    // Clear the consumed one-time cookies even on the not-live redirect so the
+    // code+state pair can't be replayed within their 600s maxAge after re-auth.
+    const res = NextResponse.redirect(`${appUrl()}/login?redirectedFrom=/integrations`);
+    res.cookies.set(`oauth_state_${provider}`, "", { maxAge: 0, path: "/" });
+    res.cookies.set(`oauth_verifier_${provider}`, "", { maxAge: 0, path: "/" });
+    return res;
   }
 
   try {
     const verifier = getProvider(provider).pkce
       ? request.cookies.get(`oauth_verifier_${provider}`)?.value
       : undefined;
+    // PKCE providers (e.g. X) must present the verifier — its whole purpose for a
+    // public client. Require it rather than silently exchanging without it.
+    if (getProvider(provider).pkce && !verifier) return fail("missing_verifier");
     const token = await exchangeCode(provider, code, verifier);
     const expiresAt = token.expiresIn
       ? new Date(Date.now() + token.expiresIn * 1000).toISOString()

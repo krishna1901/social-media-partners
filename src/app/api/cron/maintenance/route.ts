@@ -3,7 +3,7 @@ import { syncAllWorkspaces as syncAllWorkspacesAnalytics } from "@/lib/analytics
 import { syncAllWorkspacesInbox } from "@/lib/inbox/sync";
 import { runAllWorkspacesAutomations } from "@/lib/automations/runner";
 import { runAllWorkspacesEngine } from "@/lib/automations/engine";
-import { getPlatformSecret } from "@/lib/platform/secrets";
+import { isCronAuthorized } from "@/lib/cron/auth";
 
 /**
  * Consolidated maintenance cron (Phase 7).
@@ -16,17 +16,8 @@ import { getPlatformSecret } from "@/lib/platform/secrets";
  */
 export const dynamic = "force-dynamic";
 
-async function isAuthorized(request: NextRequest): Promise<boolean> {
-  const secret = await getPlatformSecret("CRON_SECRET");
-  if (!secret) return true;
-  if (request.headers.get("authorization") === `Bearer ${secret}`) return true;
-  if (request.headers.get("x-cron-secret") === secret) return true;
-  if (request.nextUrl.searchParams.get("secret") === secret) return true;
-  return false;
-}
-
 async function handle(request: NextRequest) {
-  if (!(await isAuthorized(request))) {
+  if (!(await isCronAuthorized(request))) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
   try {
