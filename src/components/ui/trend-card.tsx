@@ -17,7 +17,17 @@ export interface TrendCardData {
   note: string;
 }
 
-export function TrendCard({ trend, className }: { trend: TrendCardData; className?: string }) {
+export function TrendCard({
+  trend,
+  className,
+  onSaveAsIdea,
+  savePending,
+}: {
+  trend: TrendCardData;
+  className?: string;
+  onSaveAsIdea?: (id: string) => void;
+  savePending?: boolean;
+}) {
   return (
     <div className={cn("flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm transition-all hover:shadow-md", className)}>
       <div className="flex items-start justify-between gap-2">
@@ -49,7 +59,13 @@ export function TrendCard({ trend, className }: { trend: TrendCardData; classNam
       <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">{trend.note}</p>
 
       <div className="mt-auto flex items-center gap-2 border-t border-border pt-3">
-        <Button size="sm" variant="outline" className="flex-1">
+        <Button
+          size="sm"
+          variant="outline"
+          className="flex-1"
+          onClick={() => onSaveAsIdea?.(trend.id)}
+          disabled={savePending}
+        >
           <Lightbulb className="h-3.5 w-3.5" /> Save as idea
         </Button>
         <Button size="sm" variant="gradient" className="flex-1">

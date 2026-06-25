@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   title: "Features",
   description:
     "Everything in SocialFlow AI — AI Content Studio, scheduling, analytics, unified inbox, automations, and competitor intelligence.",
+  alternates: { canonical: "/features" },
 };
 
 const sections = [

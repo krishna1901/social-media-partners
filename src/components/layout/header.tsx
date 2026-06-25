@@ -152,7 +152,7 @@ export function Header({ onMenuClick, live }: { onMenuClick?: () => void; live?:
                   )}
                 </div>
                 <div className="max-h-80 overflow-y-auto scrollbar-thin">
-                  {unread === 0 ? (
+                  {notifications.length === 0 ? (
                     <div className="px-4 py-10 text-center">
                       <p className="text-sm font-medium text-foreground">You&apos;re all caught up</p>
                       <p className="mt-1 text-xs text-muted-foreground">New activity will show up here.</p>

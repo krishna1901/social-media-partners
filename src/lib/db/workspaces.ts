@@ -57,18 +57,34 @@ export async function ensureUserBootstrapped(
   const { error: wsError } = await supabase
     .from("workspaces")
     .insert({ id: workspaceId, name: `${baseName}'s Workspace`, owner_id: user.id, plan: "starter" });
-  if (wsError) return null;
+  if (wsError) {
+    // A concurrent bootstrap won the race (owner-unique index `uq_workspaces_owner`
+    // violation). Re-read and return the workspace that actually landed, so
+    // parallel first-login requests collapse onto one workspace instead of
+    // each creating their own.
+    const winner = await getActiveWorkspaceId(supabase, user.id);
+    if (winner) return winner;
+    await new Promise((r) => setTimeout(r, 50));
+    return getActiveWorkspaceId(supabase, user.id);
+  }
 
   // Owner membership must be created before settings (settings RLS requires
-  // workspace membership).
+  // workspace membership). Tolerate a concurrent winner here too.
   const { error: memberError } = await supabase
     .from("workspace_members")
     .insert({ workspace_id: workspaceId, user_id: user.id, role: "owner" });
-  if (memberError) return null;
+  if (memberError) {
+    const winner = await getActiveWorkspaceId(supabase, user.id);
+    return winner ?? null;
+  }
 
+  // Settings is idempotent via the workspace_id unique constraint.
   await supabase
     .from("settings")
-    .insert({ workspace_id: workspaceId, brand_name: `${baseName}'s Workspace`, timezone: "UTC" });
+    .upsert(
+      { workspace_id: workspaceId, brand_name: `${baseName}'s Workspace`, timezone: "UTC" },
+      { onConflict: "workspace_id", ignoreDuplicates: true }
+    );
 
   return workspaceId;
 }

@@ -1,5 +1,6 @@
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
+import { OrganizationJsonLd, WebSiteJsonLd } from "@/components/seo/json-ld";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
@@ -21,6 +22,8 @@ export default async function MarketingLayout({ children }: { children: React.Re
   const loggedIn = await isLoggedIn();
   return (
     <div className="flex min-h-screen flex-col bg-background">
+      <OrganizationJsonLd />
+      <WebSiteJsonLd />
       <SiteHeader loggedIn={loggedIn} />
       <main className="flex-1">{children}</main>
       <SiteFooter />

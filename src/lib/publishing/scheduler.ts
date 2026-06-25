@@ -92,6 +92,15 @@ export async function schedulePost(
   options: ScheduleOptions
 ): Promise<ScheduleResult> {
   const ctx = await requireLiveContext();
+
+  // Guard before any writes: a post with no enabled channels has nothing to
+  // publish, and scheduling it would create an orphan 'scheduled' state with
+  // zero jobs that never publishes and gives the UI no signal.
+  const platforms = await enabledPlatformsForPost(ctx, postId);
+  if (platforms.length === 0) {
+    throw new Error("Post has no enabled channels to publish.");
+  }
+
   const runAt = await resolveRunAt(ctx, options.mode, options.scheduledAt);
 
   // 1. Scheduling-intent row.
@@ -122,8 +131,7 @@ export async function schedulePost(
     .eq("id", postId)
     .eq("workspace_id", ctx.workspaceId);
 
-  // 3. Fan out one queued job per enabled channel. (No publishing happens.)
-  const platforms = await enabledPlatformsForPost(ctx, postId);
+  // 3. Fan out one queued job per enabled channel (computed above). (No publishing happens.)
   const jobs: PublishingJobRow[] = [];
   for (const platform of platforms) {
     const job = await createJob({

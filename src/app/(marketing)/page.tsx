@@ -23,6 +23,7 @@ export const metadata: Metadata = {
   title: "SocialFlow AI — The AI content command center",
   description:
     "Plan, create, schedule, and grow across every social platform with one premium, AI-powered workspace. Built for creators, marketers, and agencies.",
+  alternates: { canonical: "/" },
 };
 
 const features = [

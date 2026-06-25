@@ -202,20 +202,13 @@ export function TrendsView({ trends }: TrendsViewProps) {
       {filtered.length > 0 ? (
         <div className="grid auto-rows-fr gap-4 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((t) => (
-            <div
+            <TrendCard
               key={t.id}
-              className="contents"
-              onClickCapture={(e) => {
-                const btn = (e.target as HTMLElement).closest("button");
-                if (btn && btn.textContent?.trim().startsWith("Save as idea")) {
-                  e.preventDefault();
-                  handleSaveAsIdea(t);
-                }
-              }}
-              aria-busy={pending}
-            >
-              <TrendCard trend={t} className="h-full" />
-            </div>
+              trend={t}
+              className="h-full"
+              onSaveAsIdea={() => handleSaveAsIdea(t)}
+              savePending={pending}
+            />
           ))}
         </div>
       ) : (

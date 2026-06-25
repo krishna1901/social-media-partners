@@ -263,6 +263,22 @@ function summarize(jobs: JobOutcome[], mode: RunnerMode): RunnerSummary {
 
 /** Core loop: fetch due jobs, claim each atomically, process. */
 async function drain(client: SupabaseClient, opts: DrainOptions): Promise<JobOutcome[]> {
+  // Recover stale claims first: a job left in 'processing' (the process was
+  // killed / timed out between the claim and a terminal write — a real risk on
+  // serverless cron) is requeued so the next pass retries it. updated_at is
+  // auto-bumped on the claim by the set_updated_at trigger, so a pure
+  // time-based sweep is enough. The threshold exceeds the function's max
+  // execution time so a still-running job is never reclaimed out from under
+  // itself, and the claim's `.eq("status","queued")` guard keeps reclaim atomic.
+  const STALE_CLAIM_MS = 10 * 60_000;
+  let reclaim = client
+    .from("publishing_jobs")
+    .update({ status: "queued" })
+    .eq("status", "processing")
+    .lt("updated_at", new Date(opts.now.getTime() - STALE_CLAIM_MS).toISOString());
+  if (opts.workspaceId) reclaim = reclaim.eq("workspace_id", opts.workspaceId);
+  await reclaim;
+
   let q = client
     .from("publishing_jobs")
     .select("*")

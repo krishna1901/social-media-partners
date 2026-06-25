@@ -123,6 +123,9 @@ export async function setPostChannels(
   postId: string,
   platforms: Platform[]
 ): Promise<ActionResult<{ id: string }>> {
+  if (platforms.length === 0) {
+    return { ok: false, error: "Select at least one platform." };
+  }
   try {
     await dbSetPostChannels(postId, platforms);
     revalidatePosts();

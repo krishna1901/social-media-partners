@@ -3,6 +3,7 @@ import { AdminShell } from "@/components/admin/admin-shell";
 
 export const metadata = {
   title: { default: "Admin", template: "%s · SocialFlow Admin" },
+  robots: { index: false, follow: false },
 };
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

@@ -133,9 +133,12 @@ export async function convertIdeaToPost(ideaId: string): Promise<string> {
   if (postError || !post) throw postError ?? new Error("Failed to create post.");
 
   const postId = post.id as string;
+  // Archive the converted idea (converted_post_id preserves the link) so it
+  // leaves the active board instead of lingering as a duplicate "Draft" of the
+  // post we just created — listIdeas() excludes 'archived'.
   const { error: updateError } = await ctx.supabase
     .from("content_ideas")
-    .update({ converted_post_id: postId, status: "draft" })
+    .update({ converted_post_id: postId, status: "archived" })
     .eq("workspace_id", ctx.workspaceId)
     .eq("id", ideaId);
   if (updateError) throw updateError;

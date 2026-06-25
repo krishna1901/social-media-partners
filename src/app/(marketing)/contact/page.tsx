@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 export const metadata: Metadata = {
   title: "Contact",
   description: "Get in touch with the SocialFlow AI team — sales, support, and partnerships.",
+  alternates: { canonical: "/contact" },
 };
 
 const channels = [
